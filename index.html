@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>microgpt.js — GPT Teaching Sandbox</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #3fb950;
+  --warn: #f0883e;
+  --red: #f85149;
+  --purple: #a371f7;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+#app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 24px;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+header .subtitle {
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+#model-info {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text2);
+  background: var(--surface2);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+/* Tabs */
+nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.tab-btn {
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-radius: 6px 6px 0 0;
+  border-bottom: none;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn:hover { color: var(--text); background: var(--surface2); }
+.tab-btn.active {
+  color: var(--accent);
+  background: var(--surface2);
+  border-color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* Panels */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text2);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* Teaching cards */
+.teach-card {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.teach-card .teach-title {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.teach-card p { margin-bottom: 6px; color: var(--text); }
+.teach-card p:last-child { margin-bottom: 0; }
+.teach-card code {
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.75rem;
+  color: var(--accent2);
+}
+
+/* Contextual step explanation */
+.context-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.context-card .step-label {
+  color: var(--warn);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.context-card .highlight {
+  color: var(--accent2);
+  font-weight: 600;
+}
+.context-card .highlight2 {
+  color: var(--warn);
+  font-weight: 600;
+}
+.context-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+}
+.context-card li {
+  padding: 2px 0 2px 14px;
+  position: relative;
+  font-size: 0.82rem;
+  color: var(--text2);
+}
+.context-card li::before {
+  content: '>';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+.context-card .flow-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+  font-size: 0.78rem;
+  font-family: 'Cascadia Code', monospace;
+}
+.context-card .flow-step {
+  color: var(--accent);
+  font-weight: 600;
+}
+.context-card .flow-arrow {
+  color: var(--border);
+}
+
+/* Glossary */
+.glossary-box {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.glossary-summary {
+  padding: 10px 16px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text2);
+  user-select: none;
+}
+.glossary-summary:hover { color: var(--text); }
+.glossary-content {
+  padding: 0 16px 14px;
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 20px;
+}
+@media (max-width: 600px) {
+  .glossary-content { grid-template-columns: 1fr; }
+}
+.glossary-term {
+  font-size: 0.78rem;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.glossary-term .term-name {
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.76rem;
+}
+.glossary-term .term-desc {
+  color: var(--text2);
+  display: block;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+/* Forward Pass Layout */
+.fwd-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 800px) {
+  .fwd-layout { grid-template-columns: 1fr; }
+  .attn-grid { grid-template-columns: 1fr 1fr !important; }
+}
+
+.fwd-controls .card { margin-bottom: 10px; }
+
+input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.btn {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: inherit;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--border); border-color: var(--text2); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { background: #4090e0; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Token sequence */
+#token-sequence { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
+.token {
+  padding: 3px 9px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.8rem;
+  color: var(--text2);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.token:hover { border-color: var(--accent); }
+.token.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 700;
+  transform: scale(1.08);
+}
+.token.past { background: #1a3a2a; border-color: #2d5a3d; color: var(--accent2); }
+
+/* Info rows */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.info-label { color: var(--text2); }
+.info-value { font-family: 'Cascadia Code', monospace; }
+
+/* Logits display */
+.logits-scroll {
+  max-height: 70px;
+  overflow-y: auto;
+  font-size: 0.72rem;
+  font-family: 'Cascadia Code', monospace;
+  color: var(--text2);
+  line-height: 1.6;
+  background: var(--surface2);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* Prediction highlight */
+#correct-prob {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Sample output */
+.sample-output { display: flex; flex-wrap: wrap; gap: 6px; }
+.sample-name {
+  padding: 6px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.85rem;
+}
+.sample-idx { color: var(--text2); font-size: 0.7rem; margin-right: 4px; }
+
+/* Slider with label */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.slider-row label { color: var(--text2); font-size: 0.82rem; white-space: nowrap; }
+.slider-row .slider-val {
+  min-width: 36px;
+  text-align: center;
+  font-family: 'Cascadia Code', monospace;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Canvas containers */
+.canvas-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.canvas-box canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Attention grid */
+.attn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .attn-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.attn-cell { text-align: center; }
+.attn-cell .head-label {
+  font-size: 0.7rem;
+  color: var(--text2);
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+/* Footer */
+footer {
+  margin-top: 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text2);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Legend */
+.legend { font-size: 0.7rem; color: var(--text2); margin-top: 4px; }
+.legend span { margin-right: 10px; }
+.legend .dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+/* Position slider container */
+.pos-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+#pos-label {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: 'Cascadia Code', monospace;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <h1>microgpt.js</h1>
+  <span class="subtitle">GPT Teaching Sandbox — exploring Karpathy's microgpt in the browser</span>
+  <div id="model-info"></div>
+</header>
+
+<nav>
+  <button class="tab-btn active" data-tab="forward">Forward Pass Sandbox</button>
+  <button class="tab-btn" data-tab="sample">Generate Names</button>
+  <button class="tab-btn" data-tab="attention">Attention Viz</button>
+</nav>
+
+<div id="panels">
+
+  <!-- ======== FORWARD PASS TAB ======== -->
+  <div class="tab-panel active" id="tab-forward">
+
+    <div class="teach-card">
+      <div class="teach-title">How a Token Flows Through the GPT</div>
+      <p>
+        Input token → <code>Embedding</code> → <code>RMSNorm</code> → <code>Attention</code> (looks at past tokens)
+        → <code>Residual Add</code> → <code>MLP</code> (thinks per position) → <code>Logits</code> → <code>Softmax</code> → <b>Probability over 27 tokens</b>.
+      </p>
+      <p>
+        Step through a name token by token. At each position, the model predicts
+        what character comes next. The attention heatmaps show <b>which past tokens</b>
+        the model considers most relevant for the current prediction.
+      </p>
+    </div>
+
+    <div class="fwd-layout">
+
+      <div class="fwd-controls">
+        <div class="card">
+          <div class="card-title">Input Name</div>
+          <input type="text" id="fwd-input" value="emma" placeholder="Type a name...">
+          <div class="legend" style="margin-top:6px">
+            <span class="dot" style="background:var(--accent)"></span>current&nbsp;&nbsp;
+            <span class="dot" style="background:#1a3a2a"></span>past&nbsp;&nbsp;
+            <span class="dot" style="background:var(--surface2)"></span>future
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Token Sequence</div>
+          <div id="token-sequence"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Step Through</div>
+          <div class="pos-row">
+            <span style="font-size:0.75rem;color:var(--text2)">Pos:</span>
+            <input type="range" id="pos-slider" min="0" max="10" value="0" style="flex:1">
+            <span id="pos-label">0</span>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="btn-step-fwd">Step Forward →</button>
+            <button class="btn" id="btn-auto">Auto Play</button>
+            <button class="btn" id="btn-reset-fwd">Reset</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Current State</div>
+          <div class="info-row"><span class="info-label">Token</span><span class="info-value" id="current-token" style="color:var(--accent)">-</span></div>
+          <div class="info-row"><span class="info-label">Next Token (target)</span><span class="info-value" id="target-token" style="color:var(--accent2)">-</span></div>
+          <div class="info-row"><span class="info-label">Model assigns target</span><span class="info-value" id="correct-prob" style="color:var(--warn)">-</span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Top 5 Predictions</div>
+          <div id="top-predictions" style="font-family:'Cascadia Code',monospace;font-size:0.82rem"></div>
+        </div>
+      </div>
+
+      <div class="fwd-viz">
+        <div class="card">
+          <div class="card-title">Logits (raw scores for each token)</div>
+          <div class="logits-scroll" id="output-logits"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Probability Distribution</div>
+          <div class="canvas-box">
+            <canvas id="canvas-probs" width="800" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Attention Weights (per head — one query row × key columns)</div>
+          <div class="attn-grid">
+            <div class="attn-cell"><div class="head-label">Head 0</div><div class="canvas-box"><canvas id="attn-head-0" width="400" height="100"></canvas></div></div>
+            <div class="attn-cell"><div class="head-label">Head 1</div><div class="canvas-box"><canvas id="attn-head-1" width="400" height="100"></canvas></div></div>
+            <div class="attn-cell"><div class="head-label">Head 2</div><div class="canvas-box"><canvas id="attn-head-2" width="400" height="100"></canvas></div></div>
+            <div class="attn-cell"><div class="head-label">Head 3</div><div class="canvas-box"><canvas id="attn-head-3" width="400" height="100"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Contextual step explanation -->
+    <div class="context-card" id="context-card">
+      <div class="step-label" id="context-step-label">Ready</div>
+      <div id="context-body">
+        Press <span class="highlight">Step Forward</span> to walk through the name token by token.
+        Each step reveals what the model "sees" and what it predicts next.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ======== SAMPLE NAMES TAB ======== -->
+  <div class="tab-panel" id="tab-sample">
+
+    <div class="teach-card">
+      <div class="teach-title">Autoregressive Generation — How GPT Creates New Text</div>
+      <p>
+        The model generates names <b>one token at a time</b>. It starts with <code>&lt;BOS&gt;</code>,
+        predicts the next token, feeds it back as input, and repeats until it predicts
+        <code>&lt;BOS&gt;</code> again (end of name). This is called <b>autoregressive generation</b>
+        — the same process ChatGPT uses to write responses.
+      </p>
+      <p>
+        <b>Temperature</b> controls randomness: low (0.1) = safe, repetitive; high (1.5) = creative, chaotic.
+        At T=0, the model always picks the most likely token. The default T=0.5 gives a good balance.
+      </p>
+    </div>
+
+    <div class="card"><div class="card-title">Generate New Names</div>
+      <div class="slider-row">
+        <label for="temp-slider">Temperature</label>
+        <input type="range" id="temp-slider" min="0.1" max="1.5" step="0.05" value="0.50" style="flex:1">
+        <span class="slider-val" id="temp-value">0.50</span>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text2);margin-bottom:10px">
+        Lower = safer/more repetitive. Higher = more creative/random.
+      </p>
+      <button class="btn primary" id="btn-generate" style="margin-bottom:12px">Generate 20 Names</button>
+      <div class="sample-output" id="sample-output">
+        <span style="color:var(--text2)">Click Generate to see names...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== ATTENTION TAB ======== -->
+  <div class="tab-panel" id="tab-attention">
+
+    <div class="teach-card">
+      <div class="teach-title">How Attention Works — Q, K, V &amp; Multi-Head</div>
+      <p>
+        Each token projects itself into three vectors: <b>Query</b> ("what am I looking for?"),
+        <b>Key</b> ("what do I contain?"), and <b>Value</b> ("what do I offer if selected?").
+        The query at the current position scores every key from past positions — that is the
+        attention weight. Values are then blended by these weights.
+      </p>
+      <p>
+        <b>4 heads</b> learn different patterns (e.g. head 0 may track vowels, head 1 consonants).
+        The matrix shows <b>causal attention</b> — each row only sees itself and previous rows
+        (no looking into the future). Blue = low attention, red = high.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Multi-Head Attention Visualization</div>
+      <div class="attn-grid">
+        <div class="attn-cell">
+          <div class="head-label">Head 0</div>
+          <div class="canvas-box"><canvas id="attn-tab-h0" width="400" height="180"></canvas></div>
+        </div>
+        <div class="attn-cell">
+          <div class="head-label">Head 1</div>
+          <div class="canvas-box"><canvas id="attn-tab-h1" width="400" height="180"></canvas></div>
+        </div>
+        <div class="attn-cell">
+          <div class="head-label">Head 2</div>
+          <div class="canvas-box"><canvas id="attn-tab-h2" width="400" height="180"></canvas></div>
+        </div>
+        <div class="attn-cell">
+          <div class="head-label">Head 3</div>
+          <div class="canvas-box"><canvas id="attn-tab-h3" width="400" height="180"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Glossary -->
+<div class="glossary-box">
+  <details>
+    <summary class="glossary-summary">Glossary — Key Concepts Explained</summary>
+    <div class="glossary-content">
+      <div class="glossary-term">
+        <span class="term-name">&lt;BOS&gt;</span>
+        <span class="term-desc">Beginning of Sequence — a special token that marks the start and end of a document. The model learns that BOS means "start a new name" and another BOS means "the name is complete."</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Tokenizer</span>
+        <span class="term-desc">Converts text ↔ integers. This model uses a character-level tokenizer: each letter a-z gets a unique ID (0-25), and BOS = 26. Production models use subword tokenizers (BPE) with ~100K tokens.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Embedding</span>
+        <span class="term-desc">A lookup table that maps each token ID to a learned 16-dimensional vector. Similar tokens get similar vectors. The embedding is how the model "understands" what a token means.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Position Embedding</span>
+        <span class="term-desc">Adds a learned vector based on the token's position in the sequence (0, 1, 2...). This tells the model where each token is, since attention alone has no notion of order.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">RMSNorm</span>
+        <span class="term-desc">Root Mean Square Normalization — rescales the vector so its values have unit RMS. This stabilizes training by preventing activations from growing or shrinking as they flow through layers.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Attention (Q, K, V)</span>
+        <span class="term-desc">Query "what am I looking for?", Key "what do I contain?", Value "what do I offer?" — dot products between Q and all Keys give attention weights, which blend the Values. This is the only place tokens exchange information.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Multi-Head Attention</span>
+        <span class="term-desc">Runs 4 independent attention operations in parallel (each on a 4-dimensional subspace). Each head can learn a different attention pattern, e.g. tracking vowels vs. consonants.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">KV Cache</span>
+        <span class="term-desc">Stores Keys and Values from all previous positions so they don't need to be recomputed. The new query attends to all cached keys. Size grows by one at each step.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">MLP</span>
+        <span class="term-desc">Multi-Layer Perceptron — a per-token "thinking" step: project from 16→64 dimensions, apply ReLU, project back to 16. Unlike attention, MLP processes each position independently.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Residual Connection</span>
+        <span class="term-desc">Adds the block's input to its output (x = block(x) + x). This lets gradients flow directly through the network, making deeper models trainable. Both attention and MLP blocks use this.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Softmax</span>
+        <span class="term-desc">Converts a vector of raw scores (logits, ranging -∞ to +∞) into a probability distribution that sums to 1. The highest logit gets the most probability, but not 100% — other choices remain possible.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Logits</span>
+        <span class="term-desc">The raw output scores from the model, one per vocabulary token. Higher logit = the model thinks that token is more likely. Softmax converts these to probabilities.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Cross-Entropy Loss</span>
+        <span class="term-desc">Measures "how surprised" the model is by the actual next token: -log(predicted_prob_of_correct_token). Loss = 0 means perfect prediction; loss = 3.3 ≈ random guessing among 27 tokens.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Temperature</span>
+        <span class="term-desc">Divides logits before softmax. Low T = 0.1: sharp distribution, model always picks top token. High T = 1.5: flat distribution, more random. T = 0 is greedy (always highest prob).</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Autoregressive</span>
+        <span class="term-desc">The model feeds its own output token back as the next input. Like writing a letter: each new word depends on everything written so far. This is how all GPT models generate text.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Autograd / Backprop</span>
+        <span class="term-desc">Automatic differentiation via the chain rule. The Value class tracks every operation, building a graph. backward() walks the graph in reverse, computing how each parameter affects the loss.</span>
+      </div>
+      <div class="glossary-term">
+        <span class="term-name">Adam Optimizer</span>
+        <span class="term-desc">Adam maintains per-parameter momentum (smooths gradient direction) and adaptive learning rates (scales down frequently-updated parameters). It's the standard optimizer for training neural networks.</span>
+      </div>
+    </div>
+  </details>
+</div>
+
+<footer>
+  <span id="step-info">Ready. Type a name and step through the forward pass.</span>
+  <span><a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95" style="color:var(--text2)">microgpt.py</a> by @karpathy</span>
+</footer>
+
+</div>
+
+<script src="data/weights.js"></script>
+<script src="js/autograd.js"></script>
+<script src="js/tokenizer.js"></script>
+<script src="js/model.js"></script>
+<script src="js/optimizer.js"></script>
+<script src="js/visualize.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
