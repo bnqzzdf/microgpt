@@ -221,6 +221,8 @@ class GPT {
       x = x.map((a, i) => a.add(xResidual2[i]));
     }
 
+    trace.finalHidden = x;
+
     const logits = this.linear(x, this.stateDict.lm_head);
     const probs = this.softmax(logits);
     const loss = probs[targetId].log().neg();
@@ -233,14 +235,13 @@ class GPT {
   }
 
   // --- generation ---
-  sampleFromProbs(probs) {
+  sampleFromProbs(probs, randomValue = Math.random()) {
     // probs: array of Value objects or numbers
     const p = probs.map(v => typeof v === 'number' ? v : v.data);
-    const r = Math.random();
     let cum = 0;
     for (let i = 0; i < p.length; i++) {
       cum += p[i];
-      if (r <= cum) return i;
+      if (randomValue <= cum) return i;
     }
     return p.length - 1;
   }
@@ -254,8 +255,8 @@ class GPT {
     const stepTraces = [];
 
     for (let posId = 0; posId < maxLen; posId++) {
+      const inputToken = tokenId;
       const trace = this.forward(tokenId, posId, keys, values);
-      stepTraces.push(trace);
 
       const scaledLogits = trace.logits.map(l => l / temperature);
       // Compute scaled probs (as plain numbers for sampling)
@@ -264,7 +265,15 @@ class GPT {
       const total = exps.reduce((a, b) => a + b, 0);
       const scaledProbs = exps.map(e => e / total);
 
-      tokenId = this.sampleFromProbs(scaledProbs);
+      const randomValue = Math.random();
+      tokenId = this.sampleFromProbs(scaledProbs, randomValue);
+      trace.position = posId;
+      trace.inputToken = inputToken;
+      trace.scaledProbs = scaledProbs;
+      trace.sampleRandom = randomValue;
+      trace.sampledToken = tokenId;
+      stepTraces.push(trace);
+
       if (tokenId === bosToken) break;
       tokens.push(tokenId);
     }

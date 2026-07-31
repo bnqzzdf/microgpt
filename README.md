@@ -1,6 +1,6 @@
 # microgpt.js
 
-一个直接在浏览器中运行的微型 GPT 教学沙盒。项目用尽量少的代码展示字符级 GPT 的关键组成，并提供逐 token 前向传播、训练闭环、概率分布、注意力热力图和自回归名字生成。
+一个直接在浏览器中运行的微型 GPT 教学沙盒。项目用尽量少的代码展示字符级 GPT 的关键组成，并提供逐 token 前向传播、中间张量检查、真实梯度路径、训练闭环、注意力热力图和自回归采样轨迹。
 
 本项目是 [Andrej Karpathy 的 `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) 的可视化教学改编。原作的核心观点是：一个无依赖文件即可包含训练和推理 GPT 的完整算法，其余复杂度主要服务于效率。本项目保留这条算法主线，并将关键中间状态做成可交互界面。上游许可说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
@@ -28,6 +28,15 @@ python -m http.server 8000
 
 `<BOS>` 同时表示一个名字的开始和结束。训练目标是在每个位置根据当前及过去 token 预测下一个字符。
 
+## 交互学习路线
+
+1. **Predict**：逐位置回答“下一个 token 是什么”，并查看 Embedding、Q/K/V、Attention、MLP、Logits 和 Softmax 的真实形状与数值。
+2. **Learn**：从随机权重执行 Forward → Loss → Backward → Adam；点击一条真实梯度路径，理解链式法则如何从文档损失传到具体参数。
+3. **Generate**：查看温度缩放后的概率、实际采样 token、随机数及其落入的累积概率区间。
+4. **Attention**：比较四个 head 的完整因果注意力矩阵，理解每个位置为什么只能读取当前和过去 token。
+
+页面刻意区分“测量到的事实”和“解释性比喻”。例如注意力 head 可以学到不同模式，但只有在可视化数据支持时，才应给某个 head 指定“元音检测器”等语义角色。
+
 ## 代码导读
 
 建议按下面的顺序阅读：
@@ -37,7 +46,7 @@ python -m http.server 8000
 3. `js/model.js`：embedding、RMSNorm、因果多头注意力、MLP、softmax 和自回归采样。
 4. `js/optimizer.js`：Adam 参数更新。
 5. `generate_weights.py`：把数据、模型、loss、反向传播和训练循环串起来，并导出权重。
-6. `js/app.js` 与 `js/visualize.js`：预测、单步训练、采样和 Canvas 可视化。
+6. `js/app.js` 与 `js/visualize.js`：预测阶段检查器、梯度路径、单步训练、采样轨迹和 Canvas 可视化。
 
 核心数据流：
 

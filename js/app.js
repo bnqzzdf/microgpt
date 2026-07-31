@@ -4,6 +4,9 @@ let gpt, tokenizer, activeTab;
 let trainGpt, trainOptimizer;
 let trainingStepCount = 0;
 let trainingLossHistory = [];
+let activeInspectorStage = 'embedding';
+let gradientPathNodes = [];
+let generatedSampleResults = [];
 
 // --- initialization ---
 
@@ -38,6 +41,14 @@ function initApp() {
   document.getElementById('train-input').addEventListener('change', resetTrainingLab);
   document.getElementById('train-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') resetTrainingLab();
+  });
+  document.querySelectorAll('.stage-chip').forEach(button => {
+    button.addEventListener('click', () => {
+      activeInspectorStage = button.dataset.stage;
+      document.querySelectorAll('.stage-chip').forEach(item =>
+        item.classList.toggle('active', item === button));
+      renderStageInspector();
+    });
   });
 
   document.getElementById('temp-slider').addEventListener('input', (e) => {
@@ -280,11 +291,79 @@ function updateForwardUI() {
 
   // Update teaching text
   updateTeachingText();
+  renderStageInspector();
 
   // Also update attention tab if active
   if (activeTab === 'attention') {
     updateAttentionTab();
   }
+}
+
+function renderStageInspector() {
+  if (!fwdTraces || fwdTraces.length === 0) return;
+  const trace = fwdTraces[currentPos];
+  if (!trace || !trace.layers || !trace.layers[0]) return;
+
+  const layer = trace.layers[0];
+  const contextLength = currentPos + 1;
+  const stages = {
+    embedding: {
+      shape: '[16]',
+      values: trace.xAfterEmb,
+      color: '#58a6ff',
+      title: 'Token + position embedding, then RMSNorm',
+      description: 'The current token ID selects one learned row, its position selects another, and the two 16-number vectors are added. This is the model state before the Transformer block.',
+    },
+    qkv: {
+      shape: 'Q, K, V: [16] = 4 heads × 4',
+      values: layer.q,
+      color: '#a371f7',
+      title: 'Three learned views of the same state',
+      description: 'The chart shows Q. Separate 16×16 matrices produce Q (what this position seeks), K (how it can be matched), and V (what information it offers). Each vector is split across four heads.',
+    },
+    attention: {
+      shape: `[4 heads × ${contextLength} keys]`,
+      values: layer.attnWeights[0],
+      color: '#f0883e',
+      title: 'A probability distribution over visible positions',
+      description: `The chart shows head 0 at this position. Its ${contextLength} weights sum to 1. Causal attention exposes only the current token and earlier tokens, never the future.`,
+    },
+    mlp: {
+      shape: '[16] → [64] → ReLU → [16]',
+      values: layer.mlpPostAct,
+      color: '#3fb950',
+      title: 'Per-position feature transformation',
+      description: 'The chart shows the 64 values after ReLU. Attention mixes information between positions; the MLP then transforms features independently at the current position before the residual add.',
+    },
+    logits: {
+      shape: '[27]',
+      values: trace.logits,
+      color: '#f85149',
+      title: 'One unrestricted score per vocabulary token',
+      description: 'The language-model head maps the final 16-number state to 27 logits. A higher logit means stronger preference, but logits are scores—not probabilities and they do not sum to 1.',
+    },
+    softmax: {
+      shape: '[27], sum = 1',
+      values: trace.probs,
+      color: '#3fb950',
+      title: 'Next-token probability distribution',
+      description: 'Softmax exponentiates and normalizes all 27 logits. Training reads the probability assigned to the correct next token; generation samples one token from this distribution.',
+    },
+  };
+
+  const stage = stages[activeInspectorStage] || stages.embedding;
+  const values = stage.values || [];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mean = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+  const detail = document.getElementById('stage-inspector-detail');
+  detail.innerHTML = `
+    <span class="shape-badge">shape ${stage.shape}</span>
+    <div><strong style="color:var(--text)">${stage.title}</strong></div>
+    <div style="margin-top:5px">${stage.description}</div>
+    <div class="equation">min=${min.toFixed(3)} · mean=${mean.toFixed(3)} · max=${max.toFixed(3)}</div>
+  `;
+  Viz.drawVector(document.getElementById('canvas-stage-vector'), values, stage.color);
 }
 
 // --- attention visualization ---
@@ -373,6 +452,7 @@ function resetTrainingLab() {
   trainOptimizer = new Adam(trainGpt.params, 0.01, 0.85, 0.99, 1e-8);
   trainingStepCount = 0;
   trainingLossHistory = [];
+  gradientPathNodes = [];
 
   document.getElementById('train-step').textContent = '0';
   document.getElementById('train-loss-before').textContent = '—';
@@ -386,6 +466,10 @@ function resetTrainingLab() {
     'As training repeats, the loss should usually fall: the parameters are storing statistical patterns from the example.';
 
   document.querySelectorAll('.training-stage').forEach(stage => stage.classList.remove('active'));
+  document.getElementById('gradient-path').innerHTML =
+    '<span class="training-note">Run a training step to reveal the path.</span>';
+  document.getElementById('gradient-detail').textContent =
+    'Gradients answer: “if this number increased slightly, how would the final loss change?”';
   const canvas = document.getElementById('canvas-train-loss');
   if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
   updateTrainingTokenPairs();
@@ -431,16 +515,118 @@ function documentLoss(model, tokens, captureRows = false) {
     losses.push(trace.loss);
     if (captureRows) {
       rows.push({
+        targetId,
         input: tokenizer.tokenToDisplay(tokens[pos]),
         target: tokenizer.tokenToDisplay(targetId),
         probability: trace.probs[targetId].data,
         loss: trace.loss.data,
+        lossValue: trace.loss,
+        probabilityValue: trace.probs[targetId],
+        logitValue: trace.logits[targetId],
+        finalHidden: trace.finalHidden,
       });
     }
   }
 
   const total = losses.reduce((sum, loss) => sum.add(loss), new Value(0)).div(count);
   return { loss: total, rows };
+}
+
+function buildGradientPath(documentLossValue, rows) {
+  const hardest = [...rows].sort((a, b) => b.loss - a.loss)[0];
+  const outputWeights = trainGpt.stateDict.lm_head[hardest.targetId];
+  let dimension = 0;
+  let largestContribution = -Infinity;
+
+  for (let i = 0; i < hardest.finalHidden.length; i++) {
+    const contribution = Math.abs(hardest.finalHidden[i].data * outputWeights[i].data);
+    if (contribution > largestContribution) {
+      largestContribution = contribution;
+      dimension = i;
+    }
+  }
+
+  const hiddenValue = hardest.finalHidden[dimension];
+  const weightValue = outputWeights[dimension];
+  const pair = `${hardest.input} → ${hardest.target}`;
+
+  return [
+    {
+      name: 'Document loss',
+      value: documentLossValue.data,
+      grad: documentLossValue.grad,
+      formula: 'mean(token losses)',
+      explanation: `This single scalar summarizes all ${rows.length} next-token mistakes. Backpropagation begins by setting its gradient to 1.`,
+    },
+    {
+      name: `Token loss (${pair})`,
+      value: hardest.lossValue.data,
+      grad: hardest.lossValue.grad,
+      formula: '−log(p_target)',
+      explanation: `This was the hardest prediction in the document. Because the document loss is a mean, its gradient is divided across ${rows.length} token losses.`,
+    },
+    {
+      name: `p(${hardest.target})`,
+      value: hardest.probabilityValue.data,
+      grad: hardest.probabilityValue.grad,
+      formula: 'softmax(logits)[target]',
+      explanation: 'The loss decreases when the correct-token probability rises, so this node normally has a negative gradient.',
+    },
+    {
+      name: `logit(${hardest.target})`,
+      value: hardest.logitValue.data,
+      grad: hardest.logitValue.grad,
+      formula: 'lm_head · hidden',
+      explanation: 'Softmax couples every logit. Raising the correct logit usually lowers loss; competing logits receive gradients in the opposite direction.',
+    },
+    {
+      name: `hidden[${dimension}]`,
+      value: hiddenValue.data,
+      grad: hiddenValue.grad,
+      formula: `one coordinate of hidden[16]`,
+      explanation: `Coordinate ${dimension} made the largest absolute contribution to this target logit. Its gradient continues backward through the MLP, attention, and embeddings.`,
+    },
+    {
+      name: `lm_head[${hardest.target}][${dimension}]`,
+      value: weightValue.data,
+      grad: weightValue.grad,
+      formula: `logit += weight × hidden[${dimension}]`,
+      explanation: 'This is a learned scalar parameter. Its displayed gradient accumulates every path in the document that used this shared weight, not only the highlighted token.',
+    },
+  ];
+}
+
+function renderGradientPath(nodes, selectedIndex = 0) {
+  gradientPathNodes = nodes;
+  const path = document.getElementById('gradient-path');
+  path.innerHTML = nodes.map((node, index) => `
+    ${index > 0 ? '<span class="gradient-arrow">→</span>' : ''}
+    <button class="gradient-node ${index === selectedIndex ? 'active' : ''}" data-gradient-index="${index}">
+      <span class="gradient-node-name">${escapeHtml(node.name)}</span>
+      <span class="gradient-node-value">value ${node.value.toFixed(4)}</span>
+      <span class="gradient-node-value">grad ${node.grad.toExponential(2)}</span>
+    </button>
+  `).join('');
+
+  path.querySelectorAll('.gradient-node').forEach(button => {
+    button.addEventListener('click', () => {
+      const index = Number(button.dataset.gradientIndex);
+      renderGradientPath(gradientPathNodes, index);
+    });
+  });
+
+  const node = nodes[selectedIndex];
+  const direction = node.grad > 0
+    ? 'Increasing this node would increase the loss.'
+    : node.grad < 0
+      ? 'Increasing this node would decrease the loss.'
+      : 'This node has no first-order effect on the current loss.';
+  document.getElementById('gradient-detail').innerHTML = `
+    <strong>${escapeHtml(node.name)}</strong> · <code>${escapeHtml(node.formula)}</code><br>
+    Forward value: <code>${node.value.toFixed(6)}</code> · gradient ∂loss/∂node:
+    <code>${node.grad.toExponential(4)}</code><br>
+    ${escapeHtml(node.explanation)} ${direction}
+  `;
 }
 
 function parameterGradientStats(params) {
@@ -472,6 +658,7 @@ async function runTrainingSteps(count) {
       before.loss.backward();
 
       const stats = parameterGradientStats(trainGpt.params);
+      const gradientNodes = buildGradientPath(before.loss, before.rows);
       const trackedGrad = tracked.grad;
       trainOptimizer.step();
       const afterValue = tracked.data;
@@ -488,6 +675,7 @@ async function runTrainingSteps(count) {
         beforeValue,
         afterValue,
         trackedGrad,
+        gradientNodes,
       });
 
       if (count > 1) await sleep(0);
@@ -517,6 +705,7 @@ function updateTrainingUI(result) {
 
   document.querySelectorAll('.training-stage').forEach(stage => stage.classList.add('active'));
   Viz.drawLossCurve(document.getElementById('canvas-train-loss'), trainingLossHistory);
+  renderGradientPath(result.gradientNodes);
 
   const direction = result.afterLoss < result.beforeLoss ? 'fell' : 'rose';
   document.getElementById('train-explanation').innerHTML =
@@ -539,12 +728,65 @@ async function generateSamples() {
   for (let i = 0; i < 20; i++) {
     const result = gpt.generate(tokenizer.BOS, gpt.blockSize, temp);
     const name = tokenizer.decode(result.tokens);
-    results.push(name);
+    results.push({ name, result, temperature: temp });
   }
+  generatedSampleResults = results;
 
-  output.innerHTML = results.map((name, i) =>
-    `<div class="sample-name"><span class="sample-idx">${(i + 1).toString().padStart(2)}</span> ${name}</div>`
+  output.innerHTML = results.map((sample, i) =>
+    `<button class="sample-name ${i === 0 ? 'active' : ''}" data-sample-index="${i}"><span class="sample-idx">${(i + 1).toString().padStart(2)}</span> ${escapeHtml(sample.name || '(empty)')}</button>`
   ).join('');
+
+  output.querySelectorAll('.sample-name').forEach(button => {
+    button.addEventListener('click', () => {
+      output.querySelectorAll('.sample-name').forEach(item => item.classList.toggle('active', item === button));
+      renderSampleTrace(Number(button.dataset.sampleIndex));
+    });
+  });
+  renderSampleTrace(0);
+}
+
+function renderSampleTrace(index) {
+  const sample = generatedSampleResults[index];
+  if (!sample) return;
+
+  let prefix = '';
+  const rows = sample.result.stepTraces.map((trace, traceIndex) => {
+    const probs = trace.scaledProbs;
+    const topIndex = probs.indexOf(Math.max(...probs));
+    const sampled = trace.sampledToken;
+    const lower = probs.slice(0, sampled).reduce((sum, value) => sum + value, 0);
+    const upper = lower + probs[sampled];
+    const context = trace.position === 0 ? '<BOS>' : `<BOS> ${[...prefix].join(' ')}`;
+    const sampledLabel = tokenizer.tokenToDisplay(sampled);
+    const stopped = sampled === tokenizer.BOS;
+    const hitMaxLength = !stopped && traceIndex === sample.result.stepTraces.length - 1 &&
+      sample.result.stepTraces.length === gpt.blockSize;
+
+    if (!stopped) prefix += sampledLabel;
+
+    return `
+      <tr>
+        <td>${trace.position}</td>
+        <td>${escapeHtml(context)}</td>
+        <td>${tokenToHtml(topIndex)} ${(probs[topIndex] * 100).toFixed(1)}%</td>
+        <td><b>${tokenToHtml(sampled)}</b> ${(probs[sampled] * 100).toFixed(1)}%</td>
+        <td>${trace.sampleRandom.toFixed(3)} ∈ [${lower.toFixed(3)}, ${upper.toFixed(3)})</td>
+        <td>${stopped ? 'stop: &lt;BOS&gt;' : hitMaxLength ? 'stop: max length' : 'continue'}</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById('sample-trace').innerHTML = `
+    <div class="equation" style="margin-bottom:8px">
+      temperature T=${sample.temperature.toFixed(2)} · probabilities = softmax(logits / T) · result = ${escapeHtml(sample.name || '(empty)')}
+    </div>
+    <div style="overflow-x:auto">
+      <table class="token-pairs">
+        <thead><tr><th>pos</th><th>context</th><th>top choice</th><th>sampled</th><th>random draw and interval</th><th>action</th></tr></thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function sleep(ms) {
