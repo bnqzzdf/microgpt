@@ -1,6 +1,8 @@
 # microgpt.js
 
-一个直接在浏览器中运行的微型 GPT 教学沙盒。项目用尽量少的代码展示字符级 GPT 的关键组成，并提供逐 token 前向传播、概率分布、注意力热力图和自回归名字生成。
+一个直接在浏览器中运行的微型 GPT 教学沙盒。项目用尽量少的代码展示字符级 GPT 的关键组成，并提供逐 token 前向传播、训练闭环、概率分布、注意力热力图和自回归名字生成。
+
+本项目是 [Andrej Karpathy 的 `microgpt.py`](https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95) 的可视化教学改编。原作的核心观点是：一个无依赖文件即可包含训练和推理 GPT 的完整算法，其余复杂度主要服务于效率。本项目保留这条算法主线，并将关键中间状态做成可交互界面。上游许可说明见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
 
 ## 快速开始
 
@@ -35,7 +37,7 @@ python -m http.server 8000
 3. `js/model.js`：embedding、RMSNorm、因果多头注意力、MLP、softmax 和自回归采样。
 4. `js/optimizer.js`：Adam 参数更新。
 5. `generate_weights.py`：把数据、模型、loss、反向传播和训练循环串起来，并导出权重。
-6. `js/app.js` 与 `js/visualize.js`：教学交互和 Canvas 可视化。
+6. `js/app.js` 与 `js/visualize.js`：预测、单步训练、采样和 Canvas 可视化。
 
 核心数据流：
 
@@ -60,4 +62,3 @@ python -m http.server 8000
 ## 当前定位
 
 这是原理演示项目，不是高性能训练框架。标量级自动微分很直观，但速度和内存效率远低于 PyTorch/JAX 等张量框架；这种取舍正适合逐行理解 GPT 的核心机制。
-

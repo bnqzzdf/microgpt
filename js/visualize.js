@@ -11,11 +11,6 @@ class Viz {
   }
 
   static textColor(value, min = 0, max = 1) {
-    const t = (max - min === 0) ? 0 : Math.min(1, Math.max(0, (value - min) / (max - min)));
-    return t > 0.5 ? '#fff' : '#000';
-  }
-
-  static textColor(value, min = 0, max = 1) {
     const t = Math.min(1, Math.max(0, (value - min) / (max - min || 1)));
     return t > 0.5 ? '#fff' : '#000';
   }
@@ -205,6 +200,13 @@ class Viz {
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
+
+    if (lossHistory.length === 1) {
+      ctx.fillStyle = '#ff6b6b';
+      ctx.beginPath();
+      ctx.arc(margin.left, margin.top + plotH / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Labels
     ctx.fillStyle = '#888';

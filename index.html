@@ -70,6 +70,7 @@ nav {
   display: flex;
   gap: 4px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .tab-btn {
   padding: 8px 20px;
@@ -89,6 +90,36 @@ nav {
   background: var(--surface2);
   border-color: var(--accent);
   border-bottom: 2px solid var(--accent);
+}
+
+/* Learning path */
+.learning-path {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.path-step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px 10px;
+  font-size: 0.72rem;
+  color: var(--text2);
+}
+.path-step strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.78rem;
+  margin-bottom: 2px;
+}
+.path-step .path-number {
+  color: var(--accent);
+  font-family: 'Cascadia Code', monospace;
+  margin-right: 4px;
+}
+@media (max-width: 700px) {
+  .learning-path { grid-template-columns: 1fr 1fr; }
 }
 
 /* Panels */
@@ -298,7 +329,16 @@ input[type="range"] {
 .btn:hover { background: var(--border); border-color: var(--text2); }
 .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 .btn.primary:hover { background: #4090e0; }
+.btn:disabled { opacity: 0.55; cursor: wait; }
 .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.input-hint {
+  min-height: 1.1rem;
+  margin-top: 5px;
+  color: var(--text2);
+  font-size: 0.7rem;
+}
+.input-hint.warning { color: var(--warn); }
 
 /* Token sequence */
 #token-sequence { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -365,6 +405,72 @@ input[type="range"] {
 }
 .sample-idx { color: var(--text2); font-size: 0.7rem; margin-right: 4px; }
 
+/* Training lab */
+.training-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 1.2fr);
+  gap: 12px;
+}
+.training-stages {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.training-stage {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  min-height: 126px;
+}
+.training-stage.active { border-color: var(--accent); }
+.stage-number {
+  color: var(--accent);
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.7rem;
+  margin-bottom: 4px;
+}
+.stage-title { color: var(--text); font-weight: 700; font-size: 0.82rem; }
+.stage-body { color: var(--text2); font-size: 0.75rem; margin-top: 5px; line-height: 1.55; }
+.equation {
+  margin-top: 7px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  color: var(--accent2);
+  font: 0.72rem/1.5 'Cascadia Code', monospace;
+  overflow-wrap: anywhere;
+}
+.train-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+}
+.metric {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 9px;
+}
+.metric-label { color: var(--text2); font-size: 0.68rem; }
+.metric-value { color: var(--warn); font: 700 1rem 'Cascadia Code', monospace; }
+.token-pairs { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+.token-pairs th, .token-pairs td {
+  padding: 5px 7px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.token-pairs th { color: var(--text2); font-weight: 600; }
+.token-pairs td { font-family: 'Cascadia Code', monospace; }
+.training-note { color: var(--text2); font-size: 0.72rem; line-height: 1.55; }
+@media (max-width: 850px) {
+  .training-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .training-stages, .train-metrics { grid-template-columns: 1fr; }
+}
+
 /* Slider with label */
 .slider-row {
   display: flex;
@@ -422,6 +528,8 @@ footer {
   color: var(--text2);
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* Legend */
@@ -460,15 +568,23 @@ footer {
 
 <header>
   <h1>microgpt.js</h1>
-  <span class="subtitle">GPT Teaching Sandbox — exploring Karpathy's microgpt in the browser</span>
+  <span class="subtitle">A visual companion to Karpathy's microgpt</span>
   <div id="model-info"></div>
 </header>
 
 <nav>
-  <button class="tab-btn active" data-tab="forward">Forward Pass Sandbox</button>
-  <button class="tab-btn" data-tab="sample">Generate Names</button>
-  <button class="tab-btn" data-tab="attention">Attention Viz</button>
+  <button class="tab-btn active" data-tab="forward">1 · Predict</button>
+  <button class="tab-btn" data-tab="train">2 · Learn</button>
+  <button class="tab-btn" data-tab="sample">3 · Generate</button>
+  <button class="tab-btn" data-tab="attention">4 · Attention</button>
 </nav>
+
+<div class="learning-path" aria-label="Learning path">
+  <div class="path-step"><strong><span class="path-number">01</span>Predict</strong>How one token becomes next-token probabilities.</div>
+  <div class="path-step"><strong><span class="path-number">02</span>Learn</strong>How loss, gradients, and Adam change the weights.</div>
+  <div class="path-step"><strong><span class="path-number">03</span>Generate</strong>How predictions are fed back into the model.</div>
+  <div class="path-step"><strong><span class="path-number">04</span>Inspect</strong>How attention moves information through context.</div>
+</div>
 
 <div id="panels">
 
@@ -477,6 +593,10 @@ footer {
 
     <div class="teach-card">
       <div class="teach-title">How a Token Flows Through the GPT</div>
+      <p>
+        <b>A GPT answers one question repeatedly: “what token comes next?”</b>
+        Everything below exists to produce that probability distribution.
+      </p>
       <p>
         Input token → <code>Embedding</code> → <code>RMSNorm</code> → <code>Attention</code> (looks at past tokens)
         → <code>Residual Add</code> → <code>MLP</code> (thinks per position) → <code>Logits</code> → <code>Softmax</code> → <b>Probability over 27 tokens</b>.
@@ -493,7 +613,8 @@ footer {
       <div class="fwd-controls">
         <div class="card">
           <div class="card-title">Input Name</div>
-          <input type="text" id="fwd-input" value="emma" placeholder="Type a name...">
+          <input type="text" id="fwd-input" value="emma" maxlength="15" placeholder="Type a name..." aria-describedby="fwd-input-hint">
+          <div class="input-hint" id="fwd-input-hint">a-z only · maximum 15 characters</div>
           <div class="legend" style="margin-top:6px">
             <span class="dot" style="background:var(--accent)"></span>current&nbsp;&nbsp;
             <span class="dot" style="background:#1a3a2a"></span>past&nbsp;&nbsp;
@@ -570,6 +691,92 @@ footer {
 
   </div>
 
+  <!-- ======== TRAINING TAB ======== -->
+  <div class="tab-panel" id="tab-train">
+
+    <div class="teach-card">
+      <div class="teach-title">The Missing Half: How a GPT Learns</div>
+      <p>
+        Karpathy's original program is one continuous loop: predict every next token, measure how wrong the
+        predictions are, send that error backward through every operation, and update the parameters that influenced the example.
+      </p>
+      <p>
+        This lab uses <b>fresh random weights</b>, separate from the pretrained model in the other tabs.
+        Repeating one name intentionally overfits it so the learning mechanism is easy to see.
+      </p>
+    </div>
+
+    <div class="training-grid">
+      <div>
+        <div class="card">
+          <div class="card-title">Training Example</div>
+          <input type="text" id="train-input" value="emma" maxlength="15" placeholder="Type a name..." aria-describedby="train-input-hint">
+          <div class="input-hint" id="train-input-hint">The model learns every adjacent input → target pair.</div>
+          <div class="btn-group" style="margin-top:10px">
+            <button class="btn primary" id="btn-train-one">Run 1 training step</button>
+            <button class="btn" id="btn-train-ten">Run 10 steps</button>
+            <button class="btn" id="btn-train-reset">Reset random weights</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">What the document teaches</div>
+          <div id="train-token-pairs"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Training Progress</div>
+          <div class="train-metrics">
+            <div class="metric"><div class="metric-label">STEP</div><div class="metric-value" id="train-step">0</div></div>
+            <div class="metric"><div class="metric-label">LOSS BEFORE</div><div class="metric-value" id="train-loss-before">—</div></div>
+            <div class="metric"><div class="metric-label">LOSS AFTER</div><div class="metric-value" id="train-loss-after">—</div></div>
+          </div>
+          <div class="canvas-box"><canvas id="canvas-train-loss" width="560" height="190"></canvas></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-title">One complete optimization step</div>
+          <div class="training-stages">
+            <div class="training-stage" id="stage-forward">
+              <div class="stage-number">01 · FORWARD</div>
+              <div class="stage-title">Predict each next token</div>
+              <div class="stage-body" id="train-forward-detail">Press “Run 1 training step” to build a computation graph.</div>
+              <div class="equation">tokens → GPT → logits → softmax → probabilities</div>
+            </div>
+            <div class="training-stage" id="stage-loss">
+              <div class="stage-number">02 · LOSS</div>
+              <div class="stage-title">Turn wrongness into one number</div>
+              <div class="stage-body" id="train-loss-detail">The correct token's probability becomes cross-entropy loss.</div>
+              <div class="equation">loss = mean(−log p(correct next token))</div>
+            </div>
+            <div class="training-stage" id="stage-backward">
+              <div class="stage-number">03 · BACKWARD</div>
+              <div class="stage-title">Apply the chain rule</div>
+              <div class="stage-body" id="train-backward-detail">Autograd will calculate ∂loss/∂parameter for every weight.</div>
+              <div class="equation">loss.backward() → 4,192 gradient slots (some can be zero)</div>
+            </div>
+            <div class="training-stage" id="stage-update">
+              <div class="stage-number">04 · ADAM</div>
+              <div class="stage-title">Update the model's memory</div>
+              <div class="stage-body" id="train-update-detail">Adam combines the gradient with momentum and adaptive scaling.</div>
+              <div class="equation">parameter ← parameter − learning_rate × adjusted_gradient</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="context-card">
+          <div class="step-label">What should you notice?</div>
+          <div id="train-explanation">
+            Random guessing among 27 tokens starts near <span class="highlight2">ln(27) ≈ 3.296</span> loss.
+            As training repeats, the loss should usually fall: the parameters are storing statistical patterns from the example.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ======== SAMPLE NAMES TAB ======== -->
   <div class="tab-panel" id="tab-sample">
 
@@ -615,7 +822,8 @@ footer {
         attention weight. Values are then blended by these weights.
       </p>
       <p>
-        <b>4 heads</b> learn different patterns (e.g. head 0 may track vowels, head 1 consonants).
+        <b>4 heads</b> can learn different patterns. The colors show measured attention weights;
+        do not assign a meaning such as “vowel head” unless the examples actually support it.
         The matrix shows <b>causal attention</b> — each row only sees itself and previous rows
         (no looking into the future). Blue = low attention, red = high.
       </p>
@@ -623,6 +831,7 @@ footer {
 
     <div class="card">
       <div class="card-title">Multi-Head Attention Visualization</div>
+      <p class="training-note" id="attention-sequence" style="margin-bottom:10px"></p>
       <div class="attn-grid">
         <div class="attn-cell">
           <div class="head-label">Head 0</div>
@@ -661,7 +870,7 @@ footer {
       </div>
       <div class="glossary-term">
         <span class="term-name">Embedding</span>
-        <span class="term-desc">A lookup table that maps each token ID to a learned 16-dimensional vector. Similar tokens get similar vectors. The embedding is how the model "understands" what a token means.</span>
+        <span class="term-desc">A lookup table that maps each token ID to a learned 16-dimensional vector. Training changes these coordinates whenever that token contributes to an error; the vector is learned internal state, not a human-readable definition.</span>
       </div>
       <div class="glossary-term">
         <span class="term-name">Position Embedding</span>
@@ -677,7 +886,7 @@ footer {
       </div>
       <div class="glossary-term">
         <span class="term-name">Multi-Head Attention</span>
-        <span class="term-desc">Runs 4 independent attention operations in parallel (each on a 4-dimensional subspace). Each head can learn a different attention pattern, e.g. tracking vowels vs. consonants.</span>
+        <span class="term-desc">Runs 4 attention operations in parallel, each on a 4-dimensional slice. Heads can learn different patterns, but a semantic role such as “vowel detector” must be demonstrated from measurements rather than assumed.</span>
       </div>
       <div class="glossary-term">
         <span class="term-name">KV Cache</span>
@@ -725,17 +934,17 @@ footer {
 
 <footer>
   <span id="step-info">Ready. Type a name and step through the forward pass.</span>
-  <span><a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95" style="color:var(--text2)">microgpt.py</a> by @karpathy</span>
+  <span>Visual adaptation of <a href="https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95" style="color:var(--text2)">microgpt.py</a> by Andrej Karpathy · MIT</span>
 </footer>
 
 </div>
 
-<script src="data/weights.js"></script>
-<script src="js/autograd.js"></script>
-<script src="js/tokenizer.js"></script>
-<script src="js/model.js"></script>
-<script src="js/optimizer.js"></script>
-<script src="js/visualize.js"></script>
-<script src="js/app.js"></script>
+<script src="data/weights.js?v=2"></script>
+<script src="js/autograd.js?v=2"></script>
+<script src="js/tokenizer.js?v=2"></script>
+<script src="js/model.js?v=2"></script>
+<script src="js/optimizer.js?v=2"></script>
+<script src="js/visualize.js?v=2"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>

@@ -1,6 +1,9 @@
 // Main application controller for microgpt.js teaching sandbox
 
 let gpt, tokenizer, activeTab;
+let trainGpt, trainOptimizer;
+let trainingStepCount = 0;
+let trainingLossHistory = [];
 
 // --- initialization ---
 
@@ -8,16 +11,7 @@ function initApp() {
   const data = MICROGPT_WEIGHTS;
 
   tokenizer = new Tokenizer(data.uchars);
-
-  gpt = new GPT({
-    vocab_size: data.vocab_size,
-    n_embd: data.n_embd,
-    n_head: data.n_head,
-    n_layer: data.n_layer,
-    block_size: data.block_size,
-    head_dim: data.head_dim,
-  });
-  gpt.loadWeights(data);
+  gpt = createModel(data);
 
   document.getElementById('model-info').textContent =
     `vocab=${data.vocab_size} · embed=${data.n_embd} · heads=${data.n_head} · layers=${data.n_layer} · block=${data.block_size} · params=${gpt.params.length} · loss=${data.final_loss.toFixed(3)}`;
@@ -27,6 +21,7 @@ function initApp() {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
       if (tab === 'forward') tabForwardPass();
+      else if (tab === 'train') tabTrain();
       else if (tab === 'sample') tabSample();
       else if (tab === 'attention') tabAttention();
     });
@@ -37,6 +32,13 @@ function initApp() {
   document.getElementById('btn-generate').addEventListener('click', generateSamples);
   document.getElementById('btn-auto').addEventListener('click', autoStep);
   document.getElementById('pos-slider').addEventListener('input', jumpToPosition);
+  document.getElementById('btn-train-one').addEventListener('click', () => runTrainingSteps(1));
+  document.getElementById('btn-train-ten').addEventListener('click', () => runTrainingSteps(10));
+  document.getElementById('btn-train-reset').addEventListener('click', resetTrainingLab);
+  document.getElementById('train-input').addEventListener('change', resetTrainingLab);
+  document.getElementById('train-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') resetTrainingLab();
+  });
 
   document.getElementById('temp-slider').addEventListener('input', (e) => {
     document.getElementById('temp-value').textContent = parseFloat(e.target.value).toFixed(2);
@@ -46,8 +48,23 @@ function initApp() {
     if (e.key === 'Enter') resetForward();
   });
 
+  resetTrainingLab();
+
   // Initialize forward pass (after handlers registered)
   tabForwardPass();
+}
+
+function createModel(data) {
+  const model = new GPT({
+    vocab_size: data.vocab_size,
+    n_embd: data.n_embd,
+    n_head: data.n_head,
+    n_layer: data.n_layer,
+    block_size: data.block_size,
+    head_dim: data.head_dim,
+  });
+  model.loadWeights(data);
+  return model;
 }
 
 // --- tab switching ---
@@ -64,13 +81,28 @@ function tabForwardPass() {
   resetForward();
 }
 
+function tabTrain() {
+  setActiveTab('train');
+  updateTrainingTokenPairs();
+  document.getElementById('step-info').textContent =
+    'Training lab: fresh random weights · forward → loss → backward → Adam.';
+}
+
 function tabSample() {
   setActiveTab('sample');
+  document.getElementById('step-info').textContent =
+    'Generation: sample one token, feed it back, and repeat until <BOS>.';
 }
 
 function tabAttention() {
   setActiveTab('attention');
+  // The matrix is only meaningful after all positions have been evaluated.
+  if (fwdTokens && fwdTokens.length > 1) {
+    stepToPosition(fwdTokens.length - 2);
+  }
   updateAttentionTab();
+  document.getElementById('step-info').textContent =
+    'Attention: each row is a query; causal masking allows only current and past keys.';
 }
 
 // --- forward pass sandbox ---
@@ -79,10 +111,7 @@ let fwdInput, fwdTokens, fwdKVKeys, fwdKVValues, fwdTraces;
 let currentPos = 0;
 
 function resetForward() {
-  const name = document.getElementById('fwd-input').value.trim().toLowerCase() || 'emma';
-  // Filter to valid chars
-  const valid = name.split('').filter(ch => ch in tokenizer._charToId).join('');
-  document.getElementById('fwd-input').value = valid;
+  const valid = sanitizeNameInput('fwd-input', 'fwd-input-hint', 'emma');
 
   fwdTokens = tokenizer.encode(valid);
   fwdKVKeys = Array.from({ length: gpt.nLayer }, () => []);
@@ -98,7 +127,7 @@ function resetForward() {
   const seqEl = document.getElementById('token-sequence');
   seqEl.innerHTML = displayTokens.map((t, i) => {
     const cls = i === 0 ? 'active' : 'pending';
-    return `<span class="token ${cls}" data-idx="${i}">${tokenizer.tokenToDisplay(t)}</span>`;
+    return `<span class="token ${cls}" data-idx="${i}">${tokenToHtml(t)}</span>`;
   }).join('');
 
   seqEl.querySelectorAll('.token').forEach(el => {
@@ -117,6 +146,39 @@ function resetForward() {
   // Step to position 0
   stepToPosition(0);
   updateForwardUI();
+}
+
+function sanitizeNameInput(inputId, hintId, fallback = 'emma') {
+  const input = document.getElementById(inputId);
+  const hint = document.getElementById(hintId);
+  const raw = input.value.trim().toLowerCase();
+  const invalid = [...raw].filter(ch => !(ch in tokenizer._charToId));
+  let valid = [...raw].filter(ch => ch in tokenizer._charToId).join('');
+  const wasTooLong = valid.length > gpt.blockSize - 1;
+  valid = valid.slice(0, gpt.blockSize - 1) || fallback;
+  input.value = valid;
+
+  if (invalid.length > 0 || wasTooLong) {
+    hint.textContent = `${invalid.length > 0 ? 'Unsupported characters were removed. ' : ''}${wasTooLong ? `Input was limited to ${gpt.blockSize - 1} characters.` : ''}`;
+    hint.classList.add('warning');
+  } else {
+    hint.textContent = `${valid.length}/${gpt.blockSize - 1} characters · a-z only`;
+    hint.classList.remove('warning');
+  }
+  return valid;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function tokenToHtml(tokenId) {
+  return escapeHtml(tokenizer.tokenToDisplay(tokenId));
 }
 
 function stepForward() {
@@ -264,7 +326,11 @@ function updateAttentionTab() {
     heads.push(rows);
   }
 
-  const labels = fwdTokens.slice(1, fwdTraces.length + 1).map(t => tokenizer.tokenToDisplay(t));
+  const labels = fwdTokens.slice(0, fwdTraces.length).map(t => tokenizer.tokenToDisplay(t));
+  const sequenceEl = document.getElementById('attention-sequence');
+  if (sequenceEl) {
+    sequenceEl.textContent = `Rows are queries; columns are keys. Sequence: ${labels.join(' → ')}`;
+  }
 
   for (let h = 0; h < gpt.nHead; h++) {
     const canvas = document.getElementById(`attn-tab-h${h}`);
@@ -272,6 +338,192 @@ function updateAttentionTab() {
       Viz.drawAttention(canvas, heads[h], labels, labels);
     }
   }
+}
+
+// --- training lab ---
+
+function seededRandom(seed = 42) {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function gaussianRandom(random, std = 0.08) {
+  const u1 = Math.max(random(), Number.EPSILON);
+  const u2 = random();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * std;
+}
+
+function createRandomWeightData() {
+  const random = seededRandom(42);
+  const data = MICROGPT_WEIGHTS;
+  const weights = {};
+
+  for (const [name, matrix] of Object.entries(data.weights)) {
+    weights[name] = matrix.map(row => row.map(() => gaussianRandom(random)));
+  }
+
+  return { ...data, weights };
+}
+
+function resetTrainingLab() {
+  trainGpt = createModel(createRandomWeightData());
+  trainOptimizer = new Adam(trainGpt.params, 0.01, 0.85, 0.99, 1e-8);
+  trainingStepCount = 0;
+  trainingLossHistory = [];
+
+  document.getElementById('train-step').textContent = '0';
+  document.getElementById('train-loss-before').textContent = '—';
+  document.getElementById('train-loss-after').textContent = '—';
+  document.getElementById('train-forward-detail').textContent = 'Press “Run 1 training step” to build a computation graph.';
+  document.getElementById('train-loss-detail').textContent = 'The correct token\'s probability becomes cross-entropy loss.';
+  document.getElementById('train-backward-detail').textContent = 'Autograd will calculate ∂loss/∂parameter for every weight.';
+  document.getElementById('train-update-detail').textContent = 'Adam combines the gradient with momentum and adaptive scaling.';
+  document.getElementById('train-explanation').innerHTML =
+    'Random guessing among 27 tokens starts near <span class="highlight2">ln(27) ≈ 3.296</span> loss. ' +
+    'As training repeats, the loss should usually fall: the parameters are storing statistical patterns from the example.';
+
+  document.querySelectorAll('.training-stage').forEach(stage => stage.classList.remove('active'));
+  const canvas = document.getElementById('canvas-train-loss');
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  updateTrainingTokenPairs();
+}
+
+function getTrainingTokens() {
+  const name = sanitizeNameInput('train-input', 'train-input-hint', 'emma');
+  return { name, tokens: tokenizer.encode(name) };
+}
+
+function updateTrainingTokenPairs() {
+  if (!tokenizer) return;
+  const { tokens } = getTrainingTokens();
+  const rows = [];
+  for (let i = 0; i < tokens.length - 1; i++) {
+    rows.push(`
+      <tr>
+        <td>${i}</td>
+        <td>${tokenToHtml(tokens[i])}</td>
+        <td>→</td>
+        <td>${tokenToHtml(tokens[i + 1])}</td>
+      </tr>
+    `);
+  }
+  document.getElementById('train-token-pairs').innerHTML = `
+    <table class="token-pairs">
+      <thead><tr><th>pos</th><th>input</th><th></th><th>target</th></tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+  `;
+}
+
+function documentLoss(model, tokens, captureRows = false) {
+  const keys = Array.from({ length: model.nLayer }, () => []);
+  const values = Array.from({ length: model.nLayer }, () => []);
+  const losses = [];
+  const rows = [];
+  const count = Math.min(model.blockSize, tokens.length - 1);
+
+  for (let pos = 0; pos < count; pos++) {
+    const targetId = tokens[pos + 1];
+    const trace = model.forwardLoss(tokens[pos], pos, targetId, keys, values);
+    losses.push(trace.loss);
+    if (captureRows) {
+      rows.push({
+        input: tokenizer.tokenToDisplay(tokens[pos]),
+        target: tokenizer.tokenToDisplay(targetId),
+        probability: trace.probs[targetId].data,
+        loss: trace.loss.data,
+      });
+    }
+  }
+
+  const total = losses.reduce((sum, loss) => sum.add(loss), new Value(0)).div(count);
+  return { loss: total, rows };
+}
+
+function parameterGradientStats(params) {
+  let sumSquares = 0;
+  let maxAbs = 0;
+  let nonZero = 0;
+  for (const param of params) {
+    const abs = Math.abs(param.grad);
+    sumSquares += param.grad * param.grad;
+    maxAbs = Math.max(maxAbs, abs);
+    if (abs > 1e-12) nonZero++;
+  }
+  return { rms: Math.sqrt(sumSquares / params.length), maxAbs, nonZero };
+}
+
+async function runTrainingSteps(count) {
+  const buttons = ['btn-train-one', 'btn-train-ten', 'btn-train-reset']
+    .map(id => document.getElementById(id));
+  buttons.forEach(button => { button.disabled = true; });
+
+  try {
+    for (let step = 0; step < count; step++) {
+      const { name, tokens } = getTrainingTokens();
+      trainGpt.zeroGrad();
+
+      const tracked = trainGpt.stateDict.wte[tokenizer.BOS][0];
+      const beforeValue = tracked.data;
+      const before = documentLoss(trainGpt, tokens, true);
+      before.loss.backward();
+
+      const stats = parameterGradientStats(trainGpt.params);
+      const trackedGrad = tracked.grad;
+      trainOptimizer.step();
+      const afterValue = tracked.data;
+      const after = documentLoss(trainGpt, tokens, false).loss.data;
+
+      trainingStepCount++;
+      trainingLossHistory.push(after);
+      updateTrainingUI({
+        name,
+        beforeLoss: before.loss.data,
+        afterLoss: after,
+        rows: before.rows,
+        stats,
+        beforeValue,
+        afterValue,
+        trackedGrad,
+      });
+
+      if (count > 1) await sleep(0);
+    }
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
+
+function updateTrainingUI(result) {
+  document.getElementById('train-step').textContent = trainingStepCount;
+  document.getElementById('train-loss-before').textContent = result.beforeLoss.toFixed(3);
+  document.getElementById('train-loss-after').textContent = result.afterLoss.toFixed(3);
+  document.getElementById('train-forward-detail').textContent =
+    `${result.rows.length} positions were evaluated for “${result.name}”. Each prediction built more of the scalar computation graph.`;
+
+  const hardest = [...result.rows].sort((a, b) => b.loss - a.loss)[0];
+  document.getElementById('train-loss-detail').textContent =
+    `Average loss was ${result.beforeLoss.toFixed(3)}. Hardest pair: ${hardest.input} → ${hardest.target}, ` +
+    `p=${(hardest.probability * 100).toFixed(1)}%, loss=${hardest.loss.toFixed(3)}.`;
+  document.getElementById('train-backward-detail').textContent =
+    `${result.stats.nonZero.toLocaleString()} / ${trainGpt.params.length.toLocaleString()} parameters received a non-zero gradient. ` +
+    `Gradient RMS=${result.stats.rms.toExponential(2)}, max=${result.stats.maxAbs.toExponential(2)}.`;
+  document.getElementById('train-update-detail').textContent =
+    `Example weight wte[<BOS>][0]: ${result.beforeValue.toFixed(6)} → ${result.afterValue.toFixed(6)} ` +
+    `(raw gradient ${result.trackedGrad.toExponential(2)}).`;
+
+  document.querySelectorAll('.training-stage').forEach(stage => stage.classList.add('active'));
+  Viz.drawLossCurve(document.getElementById('canvas-train-loss'), trainingLossHistory);
+
+  const direction = result.afterLoss < result.beforeLoss ? 'fell' : 'rose';
+  document.getElementById('train-explanation').innerHTML =
+    `After step <span class="highlight">${trainingStepCount}</span>, loss ${direction} from ` +
+    `<span class="highlight2">${result.beforeLoss.toFixed(3)}</span> to ` +
+    `<span class="highlight2">${result.afterLoss.toFixed(3)}</span>. ` +
+    'One update is noisy; the important idea is that the error signal reaches every parameter that influenced this example through the chain rule.';
 }
 
 // --- sample / generate ---
@@ -322,8 +574,8 @@ function showWeightMatrix(name) {
 // --- teaching text ---
 
 function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
-  const inputToken = tokenizer.tokenToDisplay(tokenId);
-  const targetToken = tokenizer.tokenToDisplay(targetId);
+  const inputToken = tokenToHtml(tokenId);
+  const targetToken = tokenToHtml(targetId);
   const kcSize = fwdKVKeys[0].length;
 
   // Top prob info
@@ -338,7 +590,7 @@ function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
   if (trace.layers && trace.layers[0] && trace.layers[0].attnWeights) {
     const head0 = trace.layers[0].attnWeights[0];
     const maxIdx = head0.indexOf(Math.max(...head0));
-    const maxLabel = tokenizer.tokenToDisplay(fwdTokens[maxIdx]);
+    const maxLabel = tokenToHtml(fwdTokens[maxIdx]);
     attnSummary = `Head 0 focuses most on <span class="highlight">${maxLabel}</span> (position ${maxIdx}).`;
   }
 
@@ -364,7 +616,7 @@ function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
       </div>
       The model assigns <span class="highlight2">${targetProb.toFixed(1)}%</span> probability to the correct first letter
       <span class="highlight">${targetToken}</span>. Its top guess is
-      <span class="highlight">${top1.token}</span> (${top1Tie.toFixed(1)}%).
+      <span class="highlight">${escapeHtml(top1.token)}</span> (${top1Tie.toFixed(1)}%).
     `;
   } else if (pos === numPos - 1) {
     label = 'End: Knowing When to Stop';
@@ -384,7 +636,7 @@ function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
     `;
   } else {
     label = `Building Context (position ${pos} of ${numPos-1})`;
-    const pastList = fwdTokens.slice(0, pos + 1).map(t => tokenizer.tokenToDisplay(t)).join(' ');
+    const pastList = fwdTokens.slice(0, pos + 1).map(tokenToHtml).join(' ');
     body = `
       The model has seen <span class="highlight">${kcSize}</span> tokens so far:
       <span class="highlight">${pastList}</span>.
@@ -397,7 +649,7 @@ function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
         <span class="flow-step">Predict</span>
       </div>
       Correct: <span class="highlight2">${targetToken}</span> (${targetProb.toFixed(1)}%).
-      Top guess: <span class="highlight">${top1.token}</span> (${top1Tie.toFixed(1)}%).
+      Top guess: <span class="highlight">${escapeHtml(top1.token)}</span> (${top1Tie.toFixed(1)}%).
       ${attnSummary}
     `;
   }

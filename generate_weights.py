@@ -1,6 +1,10 @@
 """
 Generate and export pre-trained weights from microgpt for the browser JS version.
 Run this once to produce weights.json, used by the teaching sandbox.
+
+Adapted from Andrej Karpathy's dependency-free microgpt.py:
+https://gist.github.com/karpathy/8627fe009c40f57531cb18360106ce95
+The upstream implementation is MIT licensed; see THIRD_PARTY_NOTICES.md.
 """
 import os
 import math
