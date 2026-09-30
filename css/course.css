@@ -1,0 +1,74 @@
+/* Course styles also cover the corrected gradient fork in the free lab. */
+.language-control { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--text2); font-size: .8rem; }
+.language-control select { padding: 6px 10px; border-radius: 6px; color: var(--text); background: var(--surface2); border: 1px solid var(--border); }
+#language-status:empty { display: none; }
+[hidden] { display: none !important; }
+.gradient-path { display: block; }
+.gradient-spine { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gradient-spine .gradient-node { min-width: 0; }
+.gradient-branch-label { margin: 10px 0 6px; color: var(--text2); font-size: .74rem; }
+.gradient-branches { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gradient-branches > div { display: flex; align-items: center; gap: 6px; color: var(--purple); }
+.gradient-branches .gradient-node { width: 100%; min-width: 0; overflow-wrap: anywhere; }
+button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-visible, .course-code:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 3px;
+}
+.course-banner { padding: 20px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); margin-bottom: 14px; }
+.course-banner h2 { font-size: 1.4rem; margin: 5px 0 8px; }
+.course-kicker { color: var(--accent); font-size: .75rem; letter-spacing: .08em; }
+.course-banner p, .course-muted { color: var(--text2); font-size: .85rem; }
+.course-progress { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: .8rem; }
+.course-progress progress { flex: 1; accent-color: var(--accent2); height: 10px; }
+.course-outline { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 14px; }
+.course-outline button { padding: 10px 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); border-radius: 6px; cursor: pointer; font: inherit; font-size: .75rem; }
+.course-outline button[aria-current="step"] { color: var(--text); border-color: var(--accent); background: rgba(88,166,255,.12); }
+.course-outline small { display: block; margin-top: 4px; }
+.course-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; }
+.course-layout > *, .course-card { min-width: 0; }
+.course-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; border-radius: 8px; margin-bottom: 12px; }
+.course-card h3 { font-size: 1rem; margin-bottom: 8px; }
+.course-card h4 { font-size: .9rem; margin: 12px 0 8px; }
+.course-card p { font-size: .85rem; line-height: 1.75; margin: 8px 0; }
+.course-experiment { border-left: 4px solid var(--accent); }
+.course-experiment .btn-group { margin: 12px 0; }
+.course-tokens { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.course-token { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); font-family: monospace; }
+.course-token small { display: block; color: var(--text2); font-size: .7rem; }
+.course-token.selected { border-color: var(--accent); color: var(--accent); }
+.course-result { margin-top: 10px; }
+.course-result .equation { font-size: .8rem; }
+.course-table-wrap { overflow-x: auto; }
+.course-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.course-table td, .course-table th { border-bottom: 1px solid var(--border); padding: 7px; text-align: left; }
+.course-table th { color: var(--text2); }
+.course-table button { width: 100%; text-align: left; padding: 6px; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.course-table button[aria-pressed="true"] { border-color: var(--accent); }
+.course-table .masked { background: repeating-linear-gradient(135deg, var(--surface2), var(--surface2) 4px, var(--bg) 4px, var(--bg) 8px); color: var(--text2); }
+.course-highlight { color: var(--accent2); }
+.course-feedback { padding: 10px 12px; background: var(--surface2); border-left: 3px solid var(--warn); border-radius: 4px; margin-top: 12px; font-size: .84rem; line-height: 1.7; }
+.course-feedback.correct { border-color: var(--accent2); }
+.course-choices { display: grid; gap: 8px; margin: 12px 0; }
+.course-choices button { text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); cursor: pointer; font: inherit; font-size: .85rem; }
+.course-choices button[aria-pressed="true"] { border-color: var(--accent); }
+.course-navigation { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+.course-code { max-height: 360px; overflow: auto; font: .73rem/1.65 'Cascadia Code', monospace; background: var(--bg); border-radius: 6px; padding: 8px 0; margin-top: 10px; }
+.course-code .code-line { display: block; white-space: pre-wrap; overflow-wrap: anywhere; padding: 1px 8px; border-left: 3px solid transparent; }
+.course-code .code-line.highlight { background: rgba(88,166,255,.12); border-color: var(--accent); }
+.course-code .line-number { color: var(--text2); display: inline-block; min-width: 3em; user-select: none; }
+.course-code-path { font: .73rem monospace; color: var(--accent); overflow-wrap: anywhere; }
+.course-card select { background: var(--surface2); color: var(--text); border: 1px solid var(--border); padding: 6px; border-radius: 4px; }
+.course-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.course-comparison > div { background: var(--surface2); border-radius: 6px; padding: 10px; min-width: 0; }
+.course-comparison code { display: block; overflow-wrap: anywhere; color: var(--accent2); }
+.course-comparison p { font-size: .78rem; }
+#course-title:focus { outline: none; }
+@media (max-width: 850px) { .course-layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  #app { padding: 12px; }
+  .language-control { margin-left: 0; }
+  .course-outline { grid-template-columns: repeat(3, 1fr); }
+  .course-banner, .course-card { padding: 14px; }
+  .course-comparison, .gradient-branches { grid-template-columns: 1fr; }
+  .gradient-spine { flex-direction: column; align-items: stretch; }
+  .learning-path { display: none; }
+}

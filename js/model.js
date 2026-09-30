@@ -241,7 +241,8 @@ class GPT {
     let cum = 0;
     for (let i = 0; i < p.length; i++) {
       cum += p[i];
-      if (randomValue <= cum) return i;
+      // Match the displayed half-open intervals [lower, upper).
+      if (randomValue < cum) return i;
     }
     return p.length - 1;
   }

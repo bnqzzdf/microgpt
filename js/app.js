@@ -23,7 +23,8 @@ function initApp() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
-      if (tab === 'forward') tabForwardPass();
+      if (tab === 'course') Course.open();
+      else if (tab === 'forward') tabForwardPass();
       else if (tab === 'train') tabTrain();
       else if (tab === 'sample') tabSample();
       else if (tab === 'attention') tabAttention();
@@ -63,6 +64,8 @@ function initApp() {
 
   // Initialize forward pass (after handlers registered)
   tabForwardPass();
+  Course.init();
+  I18n.apply();
 }
 
 function createModel(data) {
@@ -82,6 +85,7 @@ function createModel(data) {
 
 function setActiveTab(name) {
   activeTab = name;
+  document.querySelector('.learning-path').hidden = name === 'course';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
@@ -532,9 +536,9 @@ function documentLoss(model, tokens, captureRows = false) {
   return { loss: total, rows };
 }
 
-function buildGradientPath(documentLossValue, rows) {
+function buildGradientPath(documentLossValue, rows, model = trainGpt) {
   const hardest = [...rows].sort((a, b) => b.loss - a.loss)[0];
-  const outputWeights = trainGpt.stateDict.lm_head[hardest.targetId];
+  const outputWeights = model.stateDict.lm_head[hardest.targetId];
   let dimension = 0;
   let largestContribution = -Infinity;
 
@@ -583,6 +587,9 @@ function buildGradientPath(documentLossValue, rows) {
       name: `hidden[${dimension}]`,
       value: hiddenValue.data,
       grad: hiddenValue.grad,
+      contribution: hardest.logitValue.grad * weightValue.data,
+      localRule: '∂L/∂hidden[j] += (∂L/∂logit) × weight[j]',
+      gradientScope: '同一位置全部候选 logit 的分支贡献',
       formula: `one coordinate of hidden[16]`,
       explanation: `Coordinate ${dimension} made the largest absolute contribution to this target logit. Its gradient continues backward through the MLP, attention, and embeddings.`,
     },
@@ -590,43 +597,61 @@ function buildGradientPath(documentLossValue, rows) {
       name: `lm_head[${hardest.target}][${dimension}]`,
       value: weightValue.data,
       grad: weightValue.grad,
+      contribution: hardest.logitValue.grad * hiddenValue.data,
+      localRule: '∂L/∂weight[j] += (∂L/∂logit) × hidden[j]',
+      gradientScope: '文档中所有使用这个共享参数的路径贡献',
       formula: `logit += weight × hidden[${dimension}]`,
       explanation: 'This is a learned scalar parameter. Its displayed gradient accumulates every path in the document that used this shared weight, not only the highlighted token.',
     },
   ];
 }
 
-function renderGradientPath(nodes, selectedIndex = 0) {
-  gradientPathNodes = nodes;
-  const path = document.getElementById('gradient-path');
-  path.innerHTML = nodes.map((node, index) => `
-    ${index > 0 ? '<span class="gradient-arrow">→</span>' : ''}
+function gradientDiagramHtml(nodes, selectedIndex = 0) {
+  const buttonHtml = (node, index) => `
     <button class="gradient-node ${index === selectedIndex ? 'active' : ''}" data-gradient-index="${index}">
       <span class="gradient-node-name">${escapeHtml(node.name)}</span>
       <span class="gradient-node-value">value ${node.value.toFixed(4)}</span>
-      <span class="gradient-node-value">grad ${node.grad.toExponential(2)}</span>
+      <span class="gradient-node-value">total grad ${node.grad.toExponential(2)}</span>
+      ${node.contribution === undefined ? '' : `<span class="gradient-node-value">this branch ${node.contribution.toExponential(2)}</span>`}
     </button>
-  `).join('');
+  `;
+  return `<div class="gradient-spine">${nodes.slice(0, 4).map((node, index) =>
+    `${index > 0 ? '<span class="gradient-arrow" aria-hidden="true">→</span>' : ''}${buttonHtml(node, index)}`).join('')}</div>
+    <div class="gradient-branch-label">logit = Σ weight[j] × hidden[j] · 两个乘法输入，各自接收梯度</div>
+    <div class="gradient-branches">${nodes.slice(4).map((node, index) =>
+      `<div><span aria-hidden="true">↳</span> ${buttonHtml(node, index + 4)}</div>`).join('')}</div>`;
+}
 
-  path.querySelectorAll('.gradient-node').forEach(button => {
-    button.addEventListener('click', () => {
-      const index = Number(button.dataset.gradientIndex);
-      renderGradientPath(gradientPathNodes, index);
-    });
-  });
-
-  const node = nodes[selectedIndex];
+function gradientDetailHtml(node) {
   const direction = node.grad > 0
     ? 'Increasing this node would increase the loss.'
     : node.grad < 0
       ? 'Increasing this node would decrease the loss.'
       : 'This node has no first-order effect on the current loss.';
-  document.getElementById('gradient-detail').innerHTML = `
-    <strong>${escapeHtml(node.name)}</strong> · <code>${escapeHtml(node.formula)}</code><br>
-    Forward value: <code>${node.value.toFixed(6)}</code> · gradient ∂loss/∂node:
+  return `<strong>${escapeHtml(node.name)}</strong> · <code>${escapeHtml(node.formula)}</code><br>
+    Forward value: <code>${node.value.toFixed(6)}</code> · total gradient ∂loss/∂node:
     <code>${node.grad.toExponential(4)}</code><br>
-    ${escapeHtml(node.explanation)} ${direction}
-  `;
+    ${node.contribution === undefined ? '' : `<code>${escapeHtml(node.localRule)}</code><br>
+      Contribution from this target-logit branch: <code>${node.contribution.toExponential(4)}</code>.
+      总梯度还累积了${escapeHtml(node.gradientScope)}。<br>`}
+    ${escapeHtml(node.explanation)} ${direction}`;
+}
+
+function renderGradientPath(nodes, selectedIndex = 0) {
+  gradientPathNodes = nodes;
+  const path = document.getElementById('gradient-path');
+  path.innerHTML = gradientDiagramHtml(nodes, selectedIndex);
+
+  path.querySelectorAll('.gradient-node').forEach(button => {
+    button.addEventListener('click', () => {
+      const index = Number(button.dataset.gradientIndex);
+      renderGradientPath(gradientPathNodes, index);
+      path.querySelector(`[data-gradient-index="${index}"]`).focus({ preventScroll: true });
+    });
+  });
+
+  const node = nodes[selectedIndex];
+  document.getElementById('gradient-detail').innerHTML = gradientDetailHtml(node);
 }
 
 function parameterGradientStats(params) {
@@ -733,7 +758,7 @@ async function generateSamples() {
   generatedSampleResults = results;
 
   output.innerHTML = results.map((sample, i) =>
-    `<button class="sample-name ${i === 0 ? 'active' : ''}" data-sample-index="${i}"><span class="sample-idx">${(i + 1).toString().padStart(2)}</span> ${escapeHtml(sample.name || '(empty)')}</button>`
+    `<button class="sample-name ${i === 0 ? 'active' : ''}" data-sample-index="${i}"><span class="sample-idx">${(i + 1).toString().padStart(2)}</span> <span ${sample.name ? 'data-no-i18n' : ''}>${escapeHtml(sample.name || '(empty)')}</span></button>`
   ).join('');
 
   output.querySelectorAll('.sample-name').forEach(button => {
@@ -873,7 +898,7 @@ function getPositionExplanation(pos, numPos, tokenId, targetId, trace) {
         <span class="flow-step">Predict</span>
       </div>
       It gives <span class="highlight2">${targetProb.toFixed(1)}%</span> to the &lt;BOS&gt; token.
-      If this is the highest probability, the model "knows" the name ends here.
+      Sampling this token would end generation; its being top-ranked alone does not force a stop.
       ${attnSummary}
     `;
   } else {
