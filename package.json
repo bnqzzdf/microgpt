@@ -1,0 +1,21 @@
+{
+  "name": "microgpt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "test": "node tests/model-checks.cjs && node tests/i18n-checks.cjs && node tests/bridge-checks.cjs",
+    "prepare:assets": "node scripts/prepare-assets.cjs",
+    "build": "npm run prepare:assets && cf build",
+    "deploy": "npm run prepare:assets && cf deploy"
+  },
+  "allowScripts": {
+    "workerd": true,
+    "esbuild": true
+  },
+  "devDependencies": {
+    "cf": "^1.0.0-beta.18",
+    "wrangler": "^4.151.1"
+  }
+}

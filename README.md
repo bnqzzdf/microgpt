@@ -14,6 +14,47 @@ python -m http.server 8000
 
 然后打开 <http://127.0.0.1:8000/>。
 
+### 部署到 Cloudflare Workers
+
+线上地址：<https://microgpt.bnqzzdf.workers.dev/>。
+
+自动部署通过 Cloudflare Workers Builds 连接 `bnqzzdf/microgpt`，生产分支为 `main`。
+构建命令为 `npm test && npm run build`，部署命令为 `npx cf deploy --prebuilt`，
+根目录为 `/`。推送到 `main` 后，Cloudflare 安装锁定的依赖、运行测试、构建并部署；
+测试或构建失败时不会执行部署。构建使用 Node.js 24，生产部署凭据由 Cloudflare 管理，
+无需将本机 OAuth 凭据或 API Token 提交到 GitHub。
+
+使用 Workers Static Assets 托管，训练和推理仍在浏览器中运行，无需服务端 API 或密钥。
+
+```sh
+npm ci
+npm test
+npm run build
+npx cf deploy --dry-run
+npm run deploy
+```
+
+首次部署前使用 `cf auth login` 登录，或通过环境变量提供具有 Workers 部署权限的
+`CLOUDFLARE_API_TOKEN`。环境变量 Token 优先于 OAuth 登录；如果 Token 权限不足，
+请在当前终端会话中移除该变量后使用 OAuth，或调整 Token 权限。
+
+本机已有的基础设施 Token 不具备部署权限。使用已授权的 cf OAuth 登录重新部署时：
+
+```powershell
+Remove-Item Env:CLOUDFLARE_API_TOKEN -ErrorAction SilentlyContinue
+$env:NODE_OPTIONS = '--dns-result-order=ipv4first'
+npm run deploy
+```
+
+以上设置只作用于当前终端会话，不修改系统保存的 Token。IPv4 优先用于规避本机连接
+Cloudflare OAuth 令牌接口时出现的超时。
+
+`cloudflare.config.ts` 管理 Worker 名称、兼容日期和观测设置；`wrangler.config.ts`
+是 cf CLI 静态站点构建器生成的构建配置，部署入口仍为 `cf`。
+`scripts/prepare-assets.cjs` 将公开网站文件复制到 `.cloudflare/site`，包含源码教学所需的
+`generate_weights.py` 和第三方许可说明，不上传 Git 历史、测试或本地缓存。
+部署生成文件和 `node_modules` 已加入 `.gitignore`。
+
 > 不建议直接双击 `index.html`；通过本地 HTTP 服务运行更接近正常部署环境。
 
 ## 中英文切换
