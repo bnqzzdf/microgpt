@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const context = vm.createContext({ document: { addEventListener() {} } });
+vm.runInContext(read('data/bridge-scenarios.js'), context);
 vm.runInContext(read('js/i18n.js'), context);
 // Expose curriculum metadata only inside this test VM, without changing production code.
 vm.runInContext(read('js/course.js').replace('return { init, open };', 'return { init, open, lessons, formula };'), context);
@@ -124,6 +125,7 @@ const fixture = vm.createContext({
     setItem(key, value) { if (denyStorage) throw new Error('disabled'); store.set(key, value); },
   },
 });
+vm.runInContext(read('data/bridge-scenarios.js'), fixture);
 vm.runInContext(read('js/i18n.js'), fixture);
 vm.runInContext('I18n.init()', fixture);
 assert.equal(selector.value, 'en');

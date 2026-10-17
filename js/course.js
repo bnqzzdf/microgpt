@@ -463,6 +463,8 @@ const Course = (() => {
       <p>GPT 根据前缀预测分布；训练用真实下一个 token 计算 Loss，梯度和 Adam 更新参数；生成采样后将自己的输出送回输入。</p>
       <div class="course-choices">${lessons.map((lesson, i) => `<button data-review="${i}">${i + 1}. ${lesson.title} · ${answerStatus(i)}</button>`).join('')}</div>
       <p>打开回顾不等于全部掌握。未掌握的概念可点击回顾，也可进入沙盒自由实验。</p></section>`;
+    $('course-summary').insertAdjacentHTML('beforeend', '<button class="btn primary" id="course-bridge">Continue: from model to assistant</button>');
+    $('course-bridge').onclick = () => BridgeCourse.open();
     document.querySelectorAll('[data-review]').forEach(button => button.onclick = () => navigate(Number(button.dataset.review)));
     if (persist) $('course-summary').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }

@@ -3,6 +3,7 @@
 const I18n = (() => {
   const KEY = 'microgpt.language';
   const messages = [
+    ...(typeof BridgeData === 'undefined' ? [] : BridgeData.messages),
     ['microgpt.js — GPT Teaching Sandbox', 'microgpt.js — GPT 教学沙盒'],
     ["A visual companion to Karpathy's microgpt", 'Karpathy microgpt 的可视化教学项目'],
     ['Guided course · 6 lessons', '引导课程 · 6 关'],

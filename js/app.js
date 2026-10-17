@@ -24,6 +24,7 @@ function initApp() {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
       if (tab === 'course') Course.open();
+      else if (tab === 'bridge') BridgeCourse.open();
       else if (tab === 'forward') tabForwardPass();
       else if (tab === 'train') tabTrain();
       else if (tab === 'sample') tabSample();
@@ -65,6 +66,7 @@ function initApp() {
   // Initialize forward pass (after handlers registered)
   tabForwardPass();
   Course.init();
+  BridgeCourse.init({ modelFactory: createModel, tokenizerFactory: chars => new Tokenizer(chars), weights: data });
   I18n.apply();
 }
 
@@ -84,8 +86,9 @@ function createModel(data) {
 // --- tab switching ---
 
 function setActiveTab(name) {
+  if (activeTab === 'bridge' && name !== 'bridge') BridgeCourse.leave();
   activeTab = name;
-  document.querySelector('.learning-path').hidden = name === 'course';
+  document.querySelector('.learning-path').hidden = name === 'course' || name === 'bridge';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
