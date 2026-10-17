@@ -3,6 +3,14 @@
 const I18n = (() => {
   const KEY = 'microgpt.language';
   const messages = [
+    ['Learning mode', '学习模式'], ['Course learning', '课程学习'], ['Free experiments', '自由实验'],
+    ['Courses', '课程'], ['Basics: understand a small GPT', '基础篇：理解一个小 GPT'],
+    ['Advanced: from model to assistant', '进阶篇：从模型到助手'],
+    ['Prediction process', '预测过程'], ['Attention observation', '注意力观察'],
+    ['Training process', '训练过程'], ['Text generation', '文本生成'],
+    ['Return to your course lesson', '返回原课程章节'],
+    ['Open text generation experiment', '打开文本生成实验'],
+    ['Loss: mean next-token cross-entropy on the current training example, using this lab’s independent weights.', 'Loss：使用本实验的独立权重，对当前训练样例计算各位置下一个 token 的平均交叉熵。'],
     ...(typeof BridgeData === 'undefined' ? [] : BridgeData.messages),
     ['microgpt.js — GPT Teaching Sandbox', 'microgpt.js — GPT 教学沙盒'],
     ["A visual companion to Karpathy's microgpt", 'Karpathy microgpt 的可视化教学项目'],
@@ -255,6 +263,11 @@ const I18n = (() => {
 
   // Slots carry numbers/tokens, never HTML. Captured prose is translated recursively.
   const templates = [
+    ['vocab={vocab} · embed={embed} · heads={heads} · layers={layers} · block={block} · params={params}', '词表={vocab} · 嵌入维数={embed} · 头数={heads} · 层数={layers} · 上下文={block} · 参数={params}'],
+    ['Start learning · lesson {n}', '开始学习 · 第 {n} 节'],
+    ['Continue learning · lesson {n}', '继续学习 · 第 {n} 节'],
+    ['Return to basics lesson {n}: {title}', '返回基础篇第 {n} 节：{title}'],
+    ['Return to advanced lesson {n}', '返回进阶篇第 {n} 节'],
     ['vocab={vocab} · embed={embed} · heads={heads} · layers={layers} · block={block} · params={params} · loss={loss}', '词表={vocab} · 嵌入维数={embed} · 头数={heads} · 层数={layers} · 上下文={block} · 参数={params} · 损失={loss}'],
     ['shape {shape}', '形状 {shape}'], ['[4 heads × {keys} keys]', '[4 个 head × {keys} 个 Key]'],
     ['Q, K, V: [16] = 4 heads × 4', 'Q、K、V：[16] = 4 个 head × 4 维'], ['[27], sum = 1', '[27]，总和 = 1'],

@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=22.18.0" },
   "scripts": {
-    "test": "node tests/model-checks.cjs && node tests/i18n-checks.cjs && node tests/bridge-checks.cjs",
+    "test": "node tests/model-checks.cjs && node tests/i18n-checks.cjs && node tests/bridge-checks.cjs && node tests/navigation-checks.cjs",
     "prepare:assets": "node scripts/prepare-assets.cjs",
     "build": "npm run prepare:assets && cf build",
     "deploy": "npm run prepare:assets && cf deploy"

@@ -47,6 +47,11 @@ for (const match of html.matchAll(/>([^<>]+)</g)) {
 console.log('PASS: static sandbox, glossary and accessibility text coverage');
 
 const examples = [
+  ['开始学习 · 第 1 节', 'Start learning · lesson 1'],
+  ['继续学习 · 第 4 节', 'Continue learning · lesson 4'],
+  ['返回基础篇第 3 节：信息从哪里来', 'Return to basics lesson 3: Where information comes from'],
+  ['返回进阶篇第 2 节', 'Return to advanced lesson 2'],
+  ['词表=27 · 嵌入维数=16 · 头数=4 · 层数=1 · 上下文=16 · 参数=4192', 'vocab=27 · embed=16 · heads=4 · layers=1 · block=16 · params=4192'],
   ['第 11 步 · Loss 0.120 → 0.088', 'Step 11 · Loss 0.120 → 0.088'],
   ['位置 2 的 Query 只能读取位置 0–2。本行权重之和 = 1.000000。', 'Query at position 2 can read only positions 0–2. This row sums to 1.000000.'],
   ['最高概率 n；实际选择 b。', 'Top token n; sampled token b.'],

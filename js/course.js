@@ -155,7 +155,6 @@ const Course = (() => {
 
   function open() {
     setActiveTab('course');
-    document.querySelector('.learning-path').hidden = true;
     render();
     $('step-info').textContent = '引导课程：固定样例 emma · 模型实验与沙盒各自独立。';
   }
@@ -176,6 +175,7 @@ const Course = (() => {
   function render() {
     const index = state.lesson;
     const lesson = lessons[index];
+    setCourseReturn('course', `返回基础篇第 ${index + 1} 节：${lesson.title}`);
     const completed = lessons.filter((item, i) => state.answers[i] === item.correct).length;
     const answered = state.answers[index];
     const banner = !storageAvailable ? '本浏览器无法保存课程进度；当前页面仍可完成所有课程。' : recovered
@@ -187,7 +187,7 @@ const Course = (() => {
         <h2>跟着真实模型，走完预测、学习与生成</h2>
         <p id="course-storage-note">${banner}</p>
         <div class="course-progress"><label for="course-progress">已掌握 ${completed} / 6</label><progress id="course-progress" max="6" value="${completed}"></progress></div>
-        <div class="btn-group"><button class="btn" id="course-exit">退出引导 · 自由探索</button><button class="btn" id="course-restart">从头学习</button></div>
+        <div class="btn-group"><button class="btn primary" id="course-start">${recovered || index > 0 || Object.keys(state.answers).length ? `继续学习 · 第 ${index + 1} 节` : '开始学习 · 第 1 节'}</button><button class="btn" id="course-exit">退出引导 · 自由探索</button><button class="btn" id="course-restart">从头学习</button></div>
       </div>
       <nav class="course-outline" aria-label="课程章节">${lessons.map((item, i) => `
         <button data-lesson="${i}" ${i === index ? 'aria-current="step"' : ''}>${i + 1}. ${item.short}<small>${answerStatus(i)}</small></button>`).join('')}</nav>
@@ -225,7 +225,8 @@ const Course = (() => {
         </aside>
       </div>`;
 
-    $('course-exit').onclick = () => exit('forward');
+    $('course-start').onclick = () => { $('course-title').focus(); $('course-title').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $('course-exit').onclick = () => exit(lesson.tab);
     $('course-explore').onclick = () => exit(lesson.tab);
     $('course-restart').onclick = () => {
       if (trainingBusy) return;
@@ -258,7 +259,6 @@ const Course = (() => {
   }
 
   function exit(tab) {
-    document.querySelector('.learning-path').hidden = false;
     ({ forward: tabForwardPass, train: tabTrain, sample: tabSample, attention: tabAttention })[tab]();
     document.querySelector(`[data-tab="${tab}"]`).focus();
   }
@@ -374,7 +374,9 @@ const Course = (() => {
     $('course-restart').disabled = true;
     const input = tokenizer.encode('emma');
     try {
+      const revision = trainingRunRevision;
       for (let i = 0; i < count; i++) {
+        if (revision !== trainingRunRevision || activeTab !== 'course') break;
         trainingModel.zeroGrad();
         const before = documentLoss(trainingModel, input, true);
         before.loss.backward();

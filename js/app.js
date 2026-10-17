@@ -1,6 +1,9 @@
 // Main application controller for microgpt.js teaching sandbox
 
 let gpt, tokenizer, activeTab;
+let lastCourseTab = 'course', lastExperimentTab = 'forward';
+let courseReturn = null;
+let forwardPlayTimer = null, trainingRunRevision = 0;
 let trainGpt, trainOptimizer;
 let trainingStepCount = 0;
 let trainingLossHistory = [];
@@ -17,19 +20,22 @@ function initApp() {
   gpt = createModel(data);
 
   document.getElementById('model-info').textContent =
-    `vocab=${data.vocab_size} · embed=${data.n_embd} · heads=${data.n_head} · layers=${data.n_layer} · block=${data.block_size} · params=${gpt.params.length} · loss=${data.final_loss.toFixed(3)}`;
+    `vocab=${data.vocab_size} · embed=${data.n_embd} · heads=${data.n_head} · layers=${data.n_layer} · block=${data.block_size} · params=${gpt.params.length}`;
 
   // Register event handlers BEFORE calling tabForwardPass (so errors there don't break tabs)
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab;
-      if (tab === 'course') Course.open();
-      else if (tab === 'bridge') BridgeCourse.open();
-      else if (tab === 'forward') tabForwardPass();
-      else if (tab === 'train') tabTrain();
-      else if (tab === 'sample') tabSample();
-      else if (tab === 'attention') tabAttention();
+      openTab(btn.dataset.tab);
     });
+  });
+
+  document.querySelectorAll('[data-mode]').forEach(button => {
+    button.addEventListener('click', () => openTab(button.dataset.mode === 'courses' ? lastCourseTab : lastExperimentTab));
+  });
+  document.getElementById('course-return').addEventListener('click', () => {
+    if (!courseReturn) return;
+    openTab(courseReturn.tab);
+    document.getElementById(courseReturn.tab === 'course' ? 'course-title' : 'bridge-title').focus();
   });
 
   document.getElementById('btn-step-fwd').addEventListener('click', stepForward);
@@ -64,7 +70,7 @@ function initApp() {
   resetTrainingLab();
 
   // Initialize forward pass (after handlers registered)
-  tabForwardPass();
+  resetForward();
   Course.init();
   BridgeCourse.init({ modelFactory: createModel, tokenizerFactory: chars => new Tokenizer(chars), weights: data });
   I18n.apply();
@@ -85,18 +91,54 @@ function createModel(data) {
 
 // --- tab switching ---
 
+function openTab(name) {
+  ({ course: () => Course.open(), bridge: () => BridgeCourse.open(), forward: tabForwardPass,
+    train: tabTrain, sample: tabSample, attention: tabAttention })[name]();
+}
+
+function setCourseReturn(tab, label) {
+  courseReturn = { tab, label };
+  document.getElementById('course-return').textContent = label;
+}
+
 function setActiveTab(name) {
+  if (activeTab !== name) {
+    clearTimeout(forwardPlayTimer);
+    forwardPlayTimer = null;
+    trainingRunRevision++;
+  }
   if (activeTab === 'bridge' && name !== 'bridge') BridgeCourse.leave();
+  const courses = name === 'course' || name === 'bridge';
+  if (courses) lastCourseTab = name;
+  else {
+    lastExperimentTab = name;
+    if (!courseReturn) setCourseReturn(lastCourseTab, 'Return to your course lesson');
+  }
   activeTab = name;
-  document.querySelector('.learning-path').hidden = name === 'course' || name === 'bridge';
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(`tab-${name}`).classList.add('active');
+  document.getElementById('course-nav').hidden = !courses;
+  document.getElementById('experiment-nav').hidden = courses;
+  document.getElementById('experiment-return').hidden = courses;
+  document.querySelectorAll('[data-mode]').forEach(button => {
+    const selected = button.dataset.mode === (courses ? 'courses' : 'experiments');
+    button.classList.toggle('active', selected);
+    if (selected) button.setAttribute('aria-current', 'true');
+    else button.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('[data-tab]').forEach(button => {
+    const selected = button.dataset.tab === name;
+    button.classList.toggle('active', selected);
+    if (selected) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `tab-${name}`);
+    panel.hidden = panel.id !== `tab-${name}`;
+  });
 }
 
 function tabForwardPass() {
   setActiveTab('forward');
-  resetForward();
+  updateForwardUI();
 }
 
 function tabTrain() {
@@ -129,6 +171,8 @@ let fwdInput, fwdTokens, fwdKVKeys, fwdKVValues, fwdTraces;
 let currentPos = 0;
 
 function resetForward() {
+  clearTimeout(forwardPlayTimer);
+  forwardPlayTimer = null;
   const valid = sanitizeNameInput('fwd-input', 'fwd-input-hint', 'emma');
 
   fwdTokens = tokenizer.encode(valid);
@@ -237,16 +281,17 @@ function stepToPosition(pos) {
 }
 
 function autoStep() {
+  clearTimeout(forwardPlayTimer);
   const maxPos = fwdTokens.length - 2;
   const delay = 400;
 
   function next(i) {
-    if (i > maxPos) return;
+    if (i > maxPos || activeTab !== 'forward') return;
     currentPos = i;
     stepToPosition(i);
     updateForwardUI();
 
-    if (i < maxPos) setTimeout(() => next(i + 1), delay);
+    if (i < maxPos) forwardPlayTimer = setTimeout(() => next(i + 1), delay);
   }
   next(currentPos);
 }
@@ -455,6 +500,7 @@ function createRandomWeightData() {
 }
 
 function resetTrainingLab() {
+  trainingRunRevision++;
   trainGpt = createModel(createRandomWeightData());
   trainOptimizer = new Adam(trainGpt.params, 0.01, 0.85, 0.99, 1e-8);
   trainingStepCount = 0;
@@ -675,8 +721,10 @@ async function runTrainingSteps(count) {
     .map(id => document.getElementById(id));
   buttons.forEach(button => { button.disabled = true; });
 
+  const revision = trainingRunRevision;
   try {
     for (let step = 0; step < count; step++) {
+      if (revision !== trainingRunRevision || activeTab !== 'train') break;
       const { name, tokens } = getTrainingTokens();
       trainGpt.zeroGrad();
 

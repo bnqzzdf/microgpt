@@ -92,34 +92,18 @@ nav {
   border-bottom: 2px solid var(--accent);
 }
 
-/* Learning path */
-.learning-path {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.path-step {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 9px 10px;
-  font-size: 0.72rem;
-  color: var(--text2);
-}
-.path-step strong {
-  display: block;
-  color: var(--text);
-  font-size: 0.78rem;
-  margin-bottom: 2px;
-}
-.path-step .path-number {
-  color: var(--accent);
-  font-family: 'Cascadia Code', monospace;
-  margin-right: 4px;
-}
-@media (max-width: 700px) {
-  .learning-path { grid-template-columns: 1fr 1fr; }
+/* Two-level navigation uses native buttons for keyboard access. */
+[hidden] { display: none !important; }
+.primary-nav { margin-bottom: 8px; }
+.primary-nav .tab-btn { font-size: 1rem; border-radius: 8px; border-bottom: 1px solid var(--border); }
+.secondary-nav { padding: 8px; background: var(--surface); border-radius: 8px; }
+.secondary-nav .tab-btn { border-radius: 6px; border-bottom: 1px solid var(--border); }
+.tab-btn:focus-visible, #course-return:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.experiment-return { margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .primary-nav .tab-btn { flex: 1; }
+  .secondary-nav .tab-btn { flex: 1 1 40%; padding: 8px; }
+  #model-info { font-size: .65rem; white-space: normal; }
 }
 
 /* Panels */
@@ -665,28 +649,30 @@ footer {
 </header>
 <div id="language-status" class="input-hint" role="status"></div>
 
-<nav>
-  <button class="tab-btn" data-tab="course">引导课程 · 6 关</button>
-  <button class="tab-btn" data-tab="bridge">From model to assistant</button>
-  <button class="tab-btn active" data-tab="forward">1 · Predict</button>
-  <button class="tab-btn" data-tab="train">2 · Learn</button>
-  <button class="tab-btn" data-tab="sample">3 · Generate</button>
-  <button class="tab-btn" data-tab="attention">4 · Attention</button>
+<nav class="primary-nav" aria-label="Learning mode">
+  <button class="tab-btn active" data-mode="courses" aria-current="true" aria-controls="course-nav">Course learning</button>
+  <button class="tab-btn" data-mode="experiments" aria-controls="experiment-nav">Free experiments</button>
 </nav>
-
-<div class="learning-path" aria-label="Learning path">
-  <div class="path-step"><strong><span class="path-number">01</span>Predict</strong>How one token becomes next-token probabilities.</div>
-  <div class="path-step"><strong><span class="path-number">02</span>Learn</strong>How loss, gradients, and Adam change the weights.</div>
-  <div class="path-step"><strong><span class="path-number">03</span>Generate</strong>How predictions are fed back into the model.</div>
-  <div class="path-step"><strong><span class="path-number">04</span>Inspect</strong>How attention moves information through context.</div>
+<nav class="secondary-nav" id="course-nav" aria-label="Courses">
+  <button class="tab-btn active" data-tab="course" aria-current="page" aria-controls="tab-course">Basics: understand a small GPT</button>
+  <button class="tab-btn" data-tab="bridge" aria-controls="tab-bridge">Advanced: from model to assistant</button>
+</nav>
+<nav class="secondary-nav" id="experiment-nav" aria-label="Free experiments" hidden>
+  <button class="tab-btn" data-tab="forward" aria-controls="tab-forward">Prediction process</button>
+  <button class="tab-btn" data-tab="attention" aria-controls="tab-attention">Attention observation</button>
+  <button class="tab-btn" data-tab="train" aria-controls="tab-train">Training process</button>
+  <button class="tab-btn" data-tab="sample" aria-controls="tab-sample">Text generation</button>
+</nav>
+<div class="experiment-return" id="experiment-return" hidden>
+  <button class="btn" id="course-return">Return to your course lesson</button>
 </div>
 
 <div id="panels">
-  <section class="tab-panel" id="tab-course" lang="zh-CN" aria-label="GPT 引导课程"></section>
+  <section class="tab-panel active" id="tab-course" lang="zh-CN" aria-label="GPT 引导课程"></section>
   <section class="tab-panel" id="tab-bridge" aria-label="From model to assistant"></section>
 
   <!-- ======== FORWARD PASS TAB ======== -->
-  <div class="tab-panel active" id="tab-forward">
+  <div class="tab-panel" id="tab-forward">
 
     <div class="teach-card">
       <div class="teach-title">How a Token Flows Through the GPT</div>
@@ -844,6 +830,7 @@ footer {
             <div class="metric"><div class="metric-label">LOSS BEFORE</div><div class="metric-value" id="train-loss-before">—</div></div>
             <div class="metric"><div class="metric-label">LOSS AFTER</div><div class="metric-value" id="train-loss-after">—</div></div>
           </div>
+          <p class="training-note">Loss: mean next-token cross-entropy on the current training example, using this lab’s independent weights.</p>
           <div class="canvas-box"><canvas id="canvas-train-loss" width="560" height="190"></canvas></div>
         </div>
       </div>

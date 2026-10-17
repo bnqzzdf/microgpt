@@ -53,11 +53,12 @@ const BridgeCourse = (() => {
   function progressNotice() { return !storage ? C.storage : restored ? C.restored : C.time; }
   function render() {
     const module = current();
+    setCourseReturn('bridge', `返回进阶篇第 ${ids.indexOf(module.id) + 1} 节`);
     $('tab-bridge').innerHTML = `
       <header class="bridge-banner"><div class="course-kicker">${raw('MICROGPT /')} ${text(C.entry)}</div>
         <h2>${esc(C.title)}</h2><p>${esc(C.intro)}</p><p class="course-muted">${esc(progressNotice())}</p>
         <div class="btn-group"><button class="btn" id="bridge-basics">${esc(C.back)}</button>
-          <button class="btn" id="bridge-restart">${esc(C.restart)}</button><button class="btn" id="bridge-export">${esc(C.export)}</button></div>
+          <button class="btn" id="bridge-experiment">Open text generation experiment</button><button class="btn" id="bridge-restart">${esc(C.restart)}</button><button class="btn" id="bridge-export">${esc(C.export)}</button></div>
         <p class="course-muted">${esc(C.recording)}</p><p id="bridge-notice" role="status">${esc(notice)}</p>
       </header>
       <details class="bridge-recap"><summary>${esc(C.reviewBasics)}</summary><p>${esc(C.memoryText)}</p></details>
@@ -70,6 +71,7 @@ const BridgeCourse = (() => {
         <button class="btn primary" id="bridge-next">${esc(module.id === 'verification' ? C.review : C.next)}</button></div>
       <section id="bridge-summary" role="status" ${progress.review ? '' : 'hidden'}>${esc(C.summary)}</section>
       <p class="bridge-disabled">${esc(C.unavailable)}</p>`;
+    $('bridge-experiment').onclick = () => { tabSample(); document.querySelector('[data-tab="sample"]').focus(); };
     $('bridge-basics').onclick = () => Course.open();
     $('bridge-restart').onclick = () => {
       pause(); progress = BridgeCore.restoreProgress(null, BridgeData.modules); restored = false; notice = '';
