@@ -77,6 +77,7 @@ class GPT {
 
     trace.tokEmb = tokEmb.map(v => v.data);
     trace.posEmb = posEmb.map(v => v.data);
+    trace.embeddingSum = tokEmb.map((v, i) => v.data + posEmb[i].data);
     trace.xAfterEmb = x.map(v => v.data);
 
     trace.layers = [];
@@ -86,7 +87,9 @@ class GPT {
 
       // --- Multi-head attention ---
       const xResidual = x;
+      lt.attnResidual = x.map(v => v.data);
       x = this.rmsnorm(x);
+      lt.attnInput = x.map(v => v.data);
 
       const q = this.linear(x, this.stateDict[`layer${li}.attn_wq`]);
       const k = this.linear(x, this.stateDict[`layer${li}.attn_wk`]);
@@ -132,7 +135,9 @@ class GPT {
         xAttn.push(...headOut);
       }
 
+      lt.attnConcat = xAttn.map(v => v.data);
       x = this.linear(xAttn, this.stateDict[`layer${li}.attn_wo`]);
+      lt.attnProjection = x.map(v => v.data);
       x = x.map((a, i) => a.add(xResidual[i]));
 
       lt.xAfterAttn = x.map(v => v.data);
@@ -140,11 +145,13 @@ class GPT {
       // --- MLP block ---
       const xResidual2 = x;
       x = this.rmsnorm(x);
+      lt.mlpInput = x.map(v => v.data);
       x = this.linear(x, this.stateDict[`layer${li}.mlp_fc1`]);
       const mlpPreAct = x.map(v => v.data);
       x = x.map(xi => xi.relu());
       const mlpPostAct = x.map(v => v.data);
       x = this.linear(x, this.stateDict[`layer${li}.mlp_fc2`]);
+      lt.mlpProjection = x.map(v => v.data);
       x = x.map((a, i) => a.add(xResidual2[i]));
 
       lt.xAfterMlp = x.map(v => v.data);
@@ -154,6 +161,7 @@ class GPT {
       trace.layers.push(lt);
     }
 
+    trace.finalHidden = x.map(v => v.data);
     const logits = this.linear(x, this.stateDict.lm_head);
     const probs = this.softmax(logits);
 

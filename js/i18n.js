@@ -11,6 +11,7 @@ const I18n = (() => {
     ['Return to your course lesson', '返回原课程章节'],
     ['Open text generation experiment', '打开文本生成实验'],
     ['Loss: mean next-token cross-entropy on the current training example, using this lab’s independent weights.', 'Loss：使用本实验的独立权重，对当前训练样例计算各位置下一个 token 的平均交叉熵。'],
+    ...(typeof BeginnerData === 'undefined' ? [] : BeginnerData.messages),
     ...(typeof BridgeData === 'undefined' ? [] : BridgeData.messages),
     ['microgpt.js — GPT Teaching Sandbox', 'microgpt.js — GPT 教学沙盒'],
     ["A visual companion to Karpathy's microgpt", 'Karpathy microgpt 的可视化教学项目'],
@@ -443,6 +444,7 @@ const I18n = (() => {
       const notice = document.getElementById('language-status');
       if (notice) notice.textContent = '无法保存语言偏好；当前页面仍可切换语言。';
     }
+    if (typeof Course !== 'undefined') Course.refreshLanguage();
     apply();
   }
 

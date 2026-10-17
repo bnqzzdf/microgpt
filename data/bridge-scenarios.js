@@ -12,7 +12,7 @@ const BridgeData = (() => {
     restored: t('Chapter and answers restored. Inputs, model state and results reset on refresh.', '已恢复章节与答题记录。刷新后输入、模型状态和实验结果均已重置。'),
     storage: t('Progress cannot be saved here. All experiments remain available.', '当前无法保存进度，但仍可使用所有实验。'),
     reviewBasics: t('60-second recap: token → conditional probabilities → sample → feed back. Training changes weights; ordinary generation does not.', '60 秒回顾：token → 条件概率 → 采样 → 送回输入。训练改变权重，普通生成不改变权重。'),
-    back: t('Back to the six lessons', '返回六关基础课'),
+    back: t('Back to the foundation course', '返回基础课程'),
     restart: t('Restart this bridge', '重学本进阶篇'),
     export: t('Download experiment record', '下载实验记录'),
     downloaded: t('Record downloaded locally; nothing was uploaded.', '记录已下载到本地，未上传任何内容。'),

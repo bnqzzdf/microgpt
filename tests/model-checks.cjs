@@ -103,9 +103,4 @@ vm.runInContext(`
   console.log('PASS: sampling interval boundaries, deterministic seed and self-fed generation');
 `, context);
 
-// Code comparisons must be extracted from real, current local source files.
-const course = read('js/course.js');
-for (const match of course.matchAll(/\{ path: '([^']+)', start: '([^']+)'/g)) {
-  assert.ok(read(match[1]).split(/\r?\n/).some(line => line.startsWith(match[2])), `Missing course source anchor: ${match[1]} / ${match[2]}`);
-}
-console.log('PASS: all JavaScript and Python course source anchors');
+// The complete non-empty 21-section source-anchor contract is verified in beginner-checks.cjs.

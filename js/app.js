@@ -115,6 +115,7 @@ function setActiveTab(name) {
     if (!courseReturn) setCourseReturn(lastCourseTab, 'Return to your course lesson');
   }
   activeTab = name;
+  if (name !== 'course') document.getElementById('model-info').hidden = false;
   document.getElementById('course-nav').hidden = !courses;
   document.getElementById('experiment-nav').hidden = courses;
   document.getElementById('experiment-return').hidden = courses;

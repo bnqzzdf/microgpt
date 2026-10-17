@@ -7,9 +7,10 @@ const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const context = vm.createContext({ document: { addEventListener() {} } });
 vm.runInContext(read('data/bridge-scenarios.js'), context);
+vm.runInContext(read('data/beginner-lessons.js'), context);
 vm.runInContext(read('js/i18n.js'), context);
 // Expose curriculum metadata only inside this test VM, without changing production code.
-vm.runInContext(read('js/course.js').replace('return { init, open };', 'return { init, open, lessons, formula };'), context);
+vm.runInContext(read('js/course.js').replace('return { init, open, refreshLanguage };', 'return { init, open, lessons, formula };'), context);
 const t = (value, lang) => {
   context.input = value;
   context.targetLanguage = lang;
@@ -29,7 +30,7 @@ for (const [index, lesson] of lessons.entries()) {
     assert.ok(!/[\u4e00-\u9fff]/.test(t(prefix + lesson.feedback, 'en')), prefix + lesson.feedback);
   }
 }
-console.log('PASS: all six lessons, choices, feedback and formulas have English translations');
+console.log('PASS: all 21 foundation lessons, choices, feedback and formulas have English translations');
 
 const decode = value => value.replaceAll('&lt;', '<').replaceAll('&gt;', '>')
   .replaceAll('&amp;', '&').replaceAll('&nbsp;', ' ').replaceAll('&mdash;', '—').replaceAll('&quot;', '"');

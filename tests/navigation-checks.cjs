@@ -15,7 +15,7 @@ const names = ['course', 'bridge', 'forward', 'attention', 'train', 'sample'];
 const buttons = names.map(tab => element({ tab }));
 const modes = ['courses', 'experiments'].map(mode => element({ mode }));
 const panels = names.map(name => Object.assign(element(), { id: `tab-${name}` }));
-const elements = Object.fromEntries([...panels.map(panel => [panel.id, panel]), ...['course-nav', 'experiment-nav', 'experiment-return', 'course-return'].map(id => [id, element()])]);
+const elements = Object.fromEntries([...panels.map(panel => [panel.id, panel]), ...['course-nav', 'experiment-nav', 'experiment-return', 'course-return', 'model-info'].map(id => [id, element()])]);
 let cleared = 0, left = 0;
 const document = {
   addEventListener() {}, getElementById: id => elements[id],
