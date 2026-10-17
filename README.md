@@ -23,6 +23,8 @@ python -m http.server 8000
 根目录为 `/`。推送到 `main` 后，Cloudflare 安装锁定的依赖、运行测试、构建并部署；
 测试或构建失败时不会执行部署。构建使用 Node.js 24，生产部署凭据由 Cloudflare 管理，
 无需将本机 OAuth 凭据或 API Token 提交到 GitHub。
+当前仅启用 `main` 的生产自动部署，其他分支的预览构建未启用。
+构建日志和发布状态可在 Cloudflare 的 microgpt 项目“部署”页面查看。
 
 使用 Workers Static Assets 托管，训练和推理仍在浏览器中运行，无需服务端 API 或密钥。
 
